@@ -1,0 +1,61 @@
+云服务器：将本机公钥安全写入 /root/.ssh/authorized_keys
+
+使用说明：
+1. 在阿里云 Linux 服务器终端中直接整块复制执行下面命令。
+2. 这套写法不会因为终端显示自动换行而把公钥写坏。
+3. 执行完成后，终端会输出：
+   - OK
+   - 最后一行完整公钥
+
+如果服务器里没有 python3，先执行：
+
+apt update && apt install -y python3
+
+然后执行下面整块：
+
+python3 - <<'PY'
+from pathlib import Path
+
+key = (
+    "ssh-rsa "
+    "AAAAB3NzaC1yc2EAAAADAQABAAACAQDjqT9nNDtY4VLpYTWrDsOk4ADOU7urZemc3kfnHh3/IORZ0mu2vF1GtCLndFlGMvTjUySbI0pBIPnGngkKV/"
+    "gFWMtfVYg9WFF2SdTMR23TmDTS9M2KjTflTgaTJ3UAYGrkR/3uymrqLgzf40jLVyNYa1GYIC8WzwSP6hHJ3TGZKahW/OZrUINTTFX22ZC/"
+    "pMTotCMkDzwc4G3Cwbr4e15V8BzTzzpukwRidIKl1dfUbYADJ8fC37enK/r1RQAoS9FsrICpilM/+2Ah4nkjI8TnRym0vb4md51qaO28IF"
+    "QuUEQ5dleRSaxlzW76WfZq/RC5ZCNqrf599KdGZwPi23+3kodiHcRVJpuGFw2A4ytLS2DAV5BcCzlHT05sdA+3pmGVi65W/dRoEeJQGJhz"
+    "+1i0RjQ3RWXb9FkFTgba+sbgrt7Sat8TjFSpJ2oatbbjAiSfUv5YwKROWl5yLeoy9TwFY/42NKI066KkS7Z3XYvtBfI1ny1U29bGeYP7cwh"
+    "yS1Aorv0Vx606AyjEZyGJxtp7+SP3gcLiC+K5FiLL/1HUH3slPII7LJWR7r2y8QosrFYep5jcqa3GxjQOIMbpNG9v1mXz+uleLF383LWTaj"
+    "F/austmFDBXMsjQHBLwHaN3z/xA1faFs3snUaRA83jE5BrbUefaQajhuaEnlDaj9Ro/Q== "
+    "liujuncheng@rog14air"
+)
+
+ssh_dir = Path("/root/.ssh")
+auth = ssh_dir / "authorized_keys"
+ssh_dir.mkdir(mode=0o700, exist_ok=True)
+
+lines = []
+if auth.exists():
+    lines = [line.rstrip("\n") for line in auth.read_text().splitlines() if line.strip()]
+
+if key not in lines:
+    lines.append(key)
+
+auth.write_text("\n".join(lines) + "\n")
+auth.chmod(0o600)
+
+print("OK")
+print(lines[-1])
+PY
+
+执行完后可再确认：
+
+tail -n 1 /root/.ssh/authorized_keys
+
+如果输出的最后一行以：
+
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ...
+
+开头，并以：
+
+liujuncheng@rog14air
+
+结尾，就说明公钥已正确写入。

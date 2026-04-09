@@ -1,0 +1,13 @@
+[Unit]
+Description=RGBT UAV FRP client
+After=network-online.target rgbt-model.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=__FRPC_BIN__ -c __FRPC_CONFIG__
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

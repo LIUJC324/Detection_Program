@@ -1,0 +1,18 @@
+serverAddr = "__FRP_SERVER_ADDR__"
+serverPort = __FRP_SERVER_PORT__
+
+auth.method = "token"
+auth.token = "__FRP_AUTH_TOKEN__"
+
+loginFailExit = true
+transport.tls.enable = true
+
+[[proxies]]
+name = "rgbt-model"
+type = "tcp"
+localIP = "__LOCAL_MODEL_HOST__"
+localPort = __LOCAL_MODEL_PORT__
+remotePort = __REMOTE_MODEL_PORT__
+
+transport.useEncryption = true
+transport.useCompression = true

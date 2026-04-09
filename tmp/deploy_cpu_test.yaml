@@ -1,0 +1,15 @@
+service:
+  host: 0.0.0.0
+  port: 8000
+  model_path: /home/liujuncheng/rgbt_uav_detection/weights/best.pt
+  class_mapping_path: /home/liujuncheng/rgbt_uav_detection/class_mapping.json
+  device: cpu
+  score_thresh: 0.25
+  nms_thresh: 0.5
+  request_timeout_seconds: 30
+  ffmpeg_path: /home/liujuncheng/miniconda3/bin/ffmpeg
+  ffprobe_path: /home/liujuncheng/miniconda3/bin/ffprobe
+  default_stream_sample_fps: 2.0
+  default_pair_layout: side_by_side_h
+  default_rgb_position: left
+  callback_timeout_seconds: 5

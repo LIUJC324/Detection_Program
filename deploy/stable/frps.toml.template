@@ -1,0 +1,15 @@
+bindPort = __FRP_BIND_PORT__
+
+auth.method = "token"
+auth.token = "__FRP_AUTH_TOKEN__"
+
+transport.tls.force = true
+
+allowPorts = [
+  { start = __REMOTE_MODEL_PORT__, end = __REMOTE_MODEL_PORT__ },
+]
+
+webServer.addr = "0.0.0.0"
+webServer.port = __FRP_DASHBOARD_PORT__
+webServer.user = "__FRP_DASHBOARD_USER__"
+webServer.password = "__FRP_DASHBOARD_PASSWORD__"

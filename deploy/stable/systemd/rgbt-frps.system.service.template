@@ -1,0 +1,13 @@
+[Unit]
+Description=RGBT UAV FRP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=__FRPS_BIN__ -c __FRPS_CONFIG__
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
