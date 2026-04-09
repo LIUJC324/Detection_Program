@@ -1,64 +1,65 @@
-# RGBT UAV Detection
+# RGBT 无人机检测项目
 
-RGB-T UAV vehicle detection project for all-weather traffic scenes.  
-The repository covers:
+面向全天候交通场景的 RGB-T 无人机车辆检测项目。  
+仓库当前覆盖：
 
-- dataset conversion and preprocessing
-- model training and evaluation
-- export and inference
-- FastAPI model service
-- video/stream session inference for frontend/backend integration
+- 数据预处理与数据转换
+- 模型训练与评估
+- 导出与单帧推理
+- FastAPI 模型服务
+- 视频 / 实时流会话式推理
+- 前后端联调支撑
 
-The current implementation is based on:
+当前实现主要基于：
 
 - `PyTorch`
 - `torchvision FCOS`
-- custom RGB-T dual-branch backbone and fusion modules
+- 自定义 RGB-T 双分支骨干与融合模块
 - `FastAPI + ffmpeg/ffprobe`
 
-## Current Status
+## 当前状态
 
-This repository is no longer just a model skeleton. The following items are already in place:
+这个仓库已经不只是一个“模型骨架”，目前已经具备：
 
-- training / evaluation / export / service pipeline
-- stream and video session inference
-- fixed public integration entry via `FRP`
-- evaluation bug fix and trusted `TP / FP / FN` metrics
-- FCOS feature-scale alignment fix
-- resumed training run completed to `epoch 60`
-- small-scope transfer-learning entry prepared for `ResNet18`
+- 训练 / 评估 / 导出 / 服务化完整链路
+- 视频与流式会话推理
+- 固定公网联调入口 `FRP`
+- 评估逻辑修复，指标已能输出可信的 `TP / FP / FN`
+- FCOS 特征尺度错位问题已修复
+- 一轮修复后续训已完整跑到 `epoch 60`
+- 小规模迁移学习入口已预留（`ResNet18`）
 
-Current model status:
+当前模型真实状态：
 
-- the model is no longer stuck at `TP = 0`
-- the repaired framework can produce positive recall
-- false positives are still very high
-- integration is usable, but model quality is not yet production-grade
+- 已经不再卡在 `TP = 0`
+- 修复后框架可以打出正召回
+- 误检仍然偏高
+- 可以联调，但还不是可直接交付的高质量模型
 
-Most important tracking document:
+当前最重要的跟踪文档：
 
 - [docs/training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
 
-## Repository Layout
+## 仓库结构
 
 ```text
 rgbt_uav_detection/
-├── configs/          # training / deployment / experiment configs
-├── data/             # dataset loading and preprocessing
-├── docs/             # training, integration, deployment, testing notes
-├── model/            # backbone, fusion, neck, head, detector assembly
-├── scripts/          # train / eval / export / utilities
-├── service/          # FastAPI service and stream session manager
-├── weights/          # best / last / deployment snapshots
-├── outputs/          # train runs, logs, evaluation outputs
+├── configs/          # 训练 / 部署 / 实验配置
+├── data/             # 数据加载与预处理
+├── docs/             # 训练、联调、部署、测试文档
+├── model/            # backbone、fusion、neck、head、detector
+├── scripts/          # 训练、评估、导出与工具脚本
+├── service/          # FastAPI 服务与流会话管理
+├── weights/          # best / last / 部署快照权重
+├── outputs/          # 训练产物、日志、评估结果
 ├── class_mapping.json
 ├── requirements.txt
 └── README.md
 ```
 
-## Data Format
+## 数据格式
 
-Default dataset layout:
+默认数据组织方式：
 
 ```text
 datasets/dronevehicle_like_refined/
@@ -73,7 +74,7 @@ datasets/dronevehicle_like_refined/
     └── val/
 ```
 
-Annotation example:
+标注 JSON 示例：
 
 ```json
 {
@@ -88,7 +89,7 @@ Annotation example:
 }
 ```
 
-Current class mapping:
+当前类别映射：
 
 ```json
 {
@@ -100,9 +101,9 @@ Current class mapping:
 }
 ```
 
-## Quick Start
+## 快速开始
 
-### 1. Train
+### 1. 训练
 
 ```bash
 cd /home/liujuncheng/rgbt_uav_detection
@@ -111,7 +112,7 @@ cd /home/liujuncheng/rgbt_uav_detection
   --num-workers 0
 ```
 
-Resume training:
+恢复训练：
 
 ```bash
 /home/liujuncheng/miniconda3/bin/python scripts/train.py \
@@ -120,7 +121,7 @@ Resume training:
   --num-workers 0
 ```
 
-### 2. Evaluate
+### 2. 评估
 
 ```bash
 /home/liujuncheng/miniconda3/bin/python scripts/evaluate.py \
@@ -130,7 +131,7 @@ Resume training:
   --num-workers 0
 ```
 
-### 3. Single-Pair Inference
+### 3. 单次图像对推理
 
 ```bash
 /home/liujuncheng/miniconda3/bin/python scripts/infer_demo.py \
@@ -138,7 +139,7 @@ Resume training:
   --thermal demo/thermal.jpg
 ```
 
-### 4. Export
+### 4. 导出
 
 ```bash
 /home/liujuncheng/miniconda3/bin/python scripts/export.py \
@@ -147,9 +148,9 @@ Resume training:
   --format both
 ```
 
-## Service
+## 模型服务
 
-### Local Service
+### 本地启动
 
 ```bash
 cd /home/liujuncheng/rgbt_uav_detection
@@ -159,16 +160,14 @@ DEPLOY_CONFIG=/home/liujuncheng/rgbt_uav_detection/configs/deploy_stable.yaml \
   --port 18000
 ```
 
-Health check:
+健康检查：
 
 ```bash
 curl -fsS http://127.0.0.1:18000/v1/health
 curl -fsS http://127.0.0.1:18000/v1/model/info
 ```
 
-### Integration Endpoints
-
-Implemented service endpoints:
+### 已实现接口
 
 - `GET /v1/health`
 - `GET /v1/model/info`
@@ -179,79 +178,84 @@ Implemented service endpoints:
 - `POST /v1/inference/stream/stop`
 - `GET /v1/inference/session/{sessionId}`
 
-Notes:
+说明：
 
-- API paths are kept stable for frontend/backend integration.
-- current callback mode is `rectangle`
-- stream/video inference uses `sampleFps` for frame sampling
+- 接口路径对前后端联调保持稳定
+- 当前回调模式是 `rectangle`
+- 视频 / 流推理通过 `sampleFps` 控制抽帧频率
 
-## Current Engineering Decisions
+## 当前工程关键决策
 
-### Trusted Evaluation
+### 1. 评估口径已修复
 
-The project previously had an AP computation issue.  
-This has been fixed, and the current evaluation outputs should be interpreted using:
+项目之前存在 AP 计算问题。现在已经修正，当前评估应结合下面这些指标一起看：
 
 - `mAP50`
 - `recall50`
 - `small_recall50`
 - `TP / FP / FN`
-- per-class stats
+- per-class 统计
 
-### FCOS Scale Fix
+### 2. FCOS 特征尺度错位已修复
 
-The most important structural issue was feature-scale mismatch between the custom RGB-T feature pyramid and `torchvision FCOS`.  
-This has been fixed in the detector assembly so the model is no longer trapped in the old “high-score point box” failure mode.
+当前最关键的结构性问题，是自定义 RGB-T 特征金字塔与 `torchvision FCOS` 的尺度假设不匹配。  
+这一点已经在 detector 装配层修复，模型不再停留在“高分点框 / 空框泛滥”的旧故障模式。
 
-### Empty-Box Handling
+### 3. 空盒问题已做模型端缓解
 
-Integration-side callback logic now includes:
+当前联调回调链路已经加入：
 
-- degenerate-box filtering
-- callback fallback confidence path
+- 退化框过滤
+- 回调 fallback 置信度路径
 
-This is meant to reduce:
+目标是降低：
 
-- frequent `boxes: []`
-- zero-area / empty rectangle artifacts
+- 高频 `boxes: []`
+- 零面积框 / 空盒 / 线盒
 
-without changing API fields.
+同时不改现有接口字段。
 
-## Small-Scope Transfer Learning
+## 小规模迁移学习入口
 
-A low-engineering-cost transfer-learning entry has been prepared:
+目前已经预留了一条工程量较小的迁移学习路线：
 
-- configurable dual-branch `ResNet18`
-- current experiment config:
+- 可切换为双分支 `ResNet18`
+- 实验配置文件：
   - [configs/experiment_resnet18_transfer.yaml](/home/liujuncheng/rgbt_uav_detection/configs/experiment_resnet18_transfer.yaml)
 
-Current limitation:
+当前限制：
 
-- there is no local cached pretrained `ResNet18` weight file in the environment
-- the repository is ready for transfer-learning experiments, but the actual pretrained checkpoint still needs to be provided locally
+- 本地还没有可直接加载的 `ResNet18` 预训练权重文件
+- 也没有本地缓存的 `torchvision` 官方权重
 
-## Integration and Demo Strategy
+所以目前是：
 
-Recommended real-time demo route:
+- 工程入口和配置已准备好
+- 真正的迁移实验还需要补一份本地预训练权重
 
-1. frontend plays video/stream
-2. backend creates session and calls model service
-3. model service samples frames and performs detection
-4. model service callbacks results to backend
-5. frontend overlays boxes on the player
+## 联调与展示建议
 
-For a more stable presentation effect, a second route is also available:
+推荐的实时演示链路：
 
-- render annotated demo videos offline and play the result as a showcase asset
+1. 前端负责播放视频 / 流
+2. 后端创建推理会话并调用模型服务
+3. 模型端按 `sampleFps` 抽帧推理
+4. 模型端回调检测结果给后端
+5. 前端在播放器上叠加检测框
 
-Useful scripts:
+如果更强调展示稳定性，也可以补一条离线方案：
+
+- 模型端离线渲染带框视频
+- 前端直接播放成品视频作为演示素材
+
+相关脚本：
 
 - [scripts/export_dronevehicle_annotated_demo.py](/home/liujuncheng/rgbt_uav_detection/scripts/export_dronevehicle_annotated_demo.py)
 - [scripts/export_dronevehicle_showcase.py](/home/liujuncheng/rgbt_uav_detection/scripts/export_dronevehicle_showcase.py)
 
-## Documentation Map
+## 文档导航
 
-Start here:
+建议从这里开始看：
 
 1. [docs/training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
 2. [docs/training/项目需求确认与借鉴优化方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/项目需求确认与借鉴优化方案_20260409.md)
@@ -260,17 +264,17 @@ Start here:
 5. [docs/ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
 6. [docs/README.md](/home/liujuncheng/rgbt_uav_detection/docs/README.md)
 
-## Roadmap
+## 后续路线
 
-Near-term priorities:
+近期优先级：
 
-- continue reducing false positives
-- verify whether empty callback frames have materially decreased in integration
-- run the prepared small-scope transfer-learning experiment
-- keep integration logs and training status synchronized into the main tracking document
+- 继续降低误检
+- 持续观察联调日志，验证空盒是否下降
+- 启动小规模迁移学习实验
+- 保持训练进展、联调状态与主文档同步
 
-Longer-term priorities:
+中长期优先级：
 
-- stronger RGB-T fusion module migration
-- cleaner deployment process
-- optional offline annotated-video generation path for demos
+- 升级 RGB-T 融合模块
+- 优化部署与服务切换流程
+- 增加离线带框视频导出链路作为演示兜底
