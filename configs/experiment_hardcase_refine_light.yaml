@@ -1,0 +1,77 @@
+project_name: rgbt_uav_detection
+seed: 42
+
+dataset:
+  root: ./datasets/dronevehicle_like_rgb_expand_refined
+  split_train: train
+  split_val: val
+  rgb_dir: rgb
+  thermal_dir: thermal
+  annotation_dir: annotations
+  rgb_suffix: _rgb
+  thermal_suffix: _thermal
+  image_size: 640
+  resize_mode: letterbox
+  letterbox_pad_value: 114
+  num_classes: 5
+  class_mapping_path: ./class_mapping.json
+  allow_empty_annotations: false
+
+model:
+  num_classes: 5
+  input_size: 640
+  backbone_name: lightweight
+  pretrained_backbone_path: ""
+  backbone_channels: [32, 64, 96]
+  fpn_out_channels: 128
+  score_thresh: 0.05
+  nms_thresh: 0.5
+  detections_per_img: 100
+
+train:
+  init_checkpoint: ./weights/deploy_best_calibrated_20260411.pt
+  epochs: 6
+  batch_size: 4
+  accumulate_steps: 2
+  num_workers: 4
+  lr: 0.000012
+  weight_decay: 0.0001
+  warmup_epochs: 1
+  warmup_start_factor: 0.5
+  amp: true
+  device: cuda
+  log_interval: 10
+  output_dir: ./outputs/train_runs
+  checkpoint_dir: ./weights/hardcase_refine_light_20260411
+  val_interval: 1
+  balance_sampling: true
+  class_balance_power: 0.5
+  small_object_area: 1024.0
+  small_object_boost: 0.4
+
+augment:
+  horizontal_flip_prob: 0.5
+  vertical_flip_prob: 0.0
+  random_crop_prob: 0.05
+  crop_min_scale: 0.94
+  color_jitter_prob: 0.35
+  brightness: 0.18
+  contrast: 0.18
+  saturation: 0.12
+  lowlight_aug_prob: 0.18
+  lowlight_gamma_min: 1.35
+  lowlight_gamma_max: 1.9
+  weak_modality_prob: 0.08
+  weak_rgb_primary_prob: 0.75
+  weak_modality_min_scale: 0.08
+  weak_modality_max_scale: 0.25
+  weak_modality_blur_prob: 0.35
+  weak_modality_noise_std: 0.02
+  motion_blur_prob: 0.10
+  motion_blur_kernel_sizes: [3, 5]
+
+export:
+  opset: 17
+  dynamic_axes: true
+  onnx_path: ./weights/rgbt_detector.onnx
+  torchscript_path: ./weights/rgbt_detector.ts
