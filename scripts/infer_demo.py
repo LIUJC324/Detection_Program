@@ -6,13 +6,13 @@ import sys
 from pathlib import Path
 
 import cv2
-import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from service.core.predictor import Predictor
+from service.utils import AnnotatorConfig, DetectionAnnotator
 
 
 def parse_args():
@@ -25,19 +25,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def draw_detections(image: np.ndarray, detections):
-    canvas = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-    for det in detections:
-        x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
-        label = f'{det["class_name"]}:{det["confidence"]:.2f}'
-        cv2.rectangle(canvas, (x1, y1), (x2, y2), (0, 200, 255), 2)
-        cv2.putText(canvas, label, (x1, max(16, y1 - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 200, 255), 1)
-    return canvas
-
-
 def main():
     args = parse_args()
     predictor = Predictor.from_deploy_config(args.deploy_config)
+    annotator = DetectionAnnotator(config=AnnotatorConfig(annotation_mode="rectangle", min_confidence=0.0))
 
     with open(args.rgb, "rb") as fp:
         rgb_data = fp.read()
@@ -46,7 +37,7 @@ def main():
 
     result = predictor.predict(rgb_data, thermal_data)
     rgb_image = predictor.last_rgb_image
-    vis = draw_detections(rgb_image, result["detections"])
+    vis = annotator.annotate(rgb_image, result["detections"])
 
     output_image = Path(args.output_image)
     output_json = Path(args.output_json)
@@ -60,4 +51,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

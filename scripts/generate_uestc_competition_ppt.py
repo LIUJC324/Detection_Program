@@ -11,11 +11,12 @@ from pptx.util import Inches, Pt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
+ARCH_DIR = DOCS_DIR / "architecture"
 OUTPUT_PPT = DOCS_DIR / "AerialEye_计设比赛答辩汇报_电子科大风格版_20260407.pptx"
 
-IMG_PROJECT_ARCH = DOCS_DIR / "project_architecture.png"
-IMG_BACKEND_ARCH = PROJECT_ROOT / "前后端相关" / "后端架构图.png"
-IMG_ML_LAYERED = DOCS_DIR / "ml_layered_architecture.png"
+IMG_PROJECT_ARCH = ARCH_DIR / "project_architecture.png"
+IMG_BACKEND_ARCH = ARCH_DIR / "后端架构图.png"
+IMG_ML_LAYERED = ARCH_DIR / "ml_layered_architecture.png"
 
 SLIDE_W = 13.333
 SLIDE_H = 7.5

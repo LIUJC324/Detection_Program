@@ -7,7 +7,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-OUTPUT_PATH = PROJECT_ROOT / "docs" / "project_architecture.png"
+OUTPUT_PATH = PROJECT_ROOT / "docs" / "architecture" / "project_architecture.png"
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",

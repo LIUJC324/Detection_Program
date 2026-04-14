@@ -8,10 +8,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DOCS_DIR = PROJECT_ROOT / "docs"
-ML_OUTPUT = DOCS_DIR / "ml_layered_architecture.png"
-SYSTEM_OUTPUT = DOCS_DIR / "system_layered_architecture.png"
-PRINCIPLES_OUTPUT = DOCS_DIR / "ml_basic_principles.png"
-NOTES_OUTPUT = DOCS_DIR / "architecture_diagrams_notes.md"
+ARCH_DIR = DOCS_DIR / "architecture"
+ML_OUTPUT = ARCH_DIR / "ml_layered_architecture.png"
+SYSTEM_OUTPUT = ARCH_DIR / "system_layered_architecture.png"
+PRINCIPLES_OUTPUT = ARCH_DIR / "ml_basic_principles.png"
+NOTES_OUTPUT = ARCH_DIR / "diagram_notes.md"
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
@@ -623,7 +624,7 @@ def render_system_architecture() -> None:
 
     draw.text(
         (70, 1638),
-        "说明：橙/紫色模块来自“前后端相关/interface.md”与协作方方案；蓝色模块表示项目中的 ML 模型、服务和会话检测部分；图中已经按可展示方案补全了会话适配链路。",
+        "说明：橙/紫色模块来自“docs/integration/interface.md”与协作方方案；蓝色模块表示项目中的 ML 模型、服务和会话检测部分；图中已经按可展示方案补全了会话适配链路。",
         font=small_font,
         fill=PALETTE["muted"],
     )
@@ -746,9 +747,9 @@ def write_notes() -> None:
 
 本次新增三张图：
 
-- `docs/ml_layered_architecture.png`
-- `docs/system_layered_architecture.png`
-- `docs/ml_basic_principles.png`
+- `docs/architecture/ml_layered_architecture.png`
+- `docs/architecture/system_layered_architecture.png`
+- `docs/architecture/ml_basic_principles.png`
 
 ## 口径说明
 
@@ -757,7 +758,7 @@ def write_notes() -> None:
    - 代码依据：`data/*`、`model/*`、`scripts/*`、`service/*`、`configs/*`。
 
 2. `项目整体结构图`
-   - 融合了你自己的 ML 仓库实现，和 `前后端相关/interface.md` 中整理出的前后端接口流程。
+   - 融合了你自己的 ML 仓库实现，和 `docs/integration/interface.md` 中整理出的前后端接口流程。
    - 其中蓝色框表示项目中的 ML 模型与检测服务部分；橙色/紫色框表示前后端部分；会话检测链路也已经一并画入完整方案。
 
 3. `基本原理图`

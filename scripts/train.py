@@ -41,6 +41,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Train the RGB-T UAV detection model.")
     parser.add_argument("--config", type=str, default=str(PROJECT_ROOT / "configs" / "default.yaml"))
     parser.add_argument("--resume", type=str, default="")
+    parser.add_argument("--init-checkpoint", type=str, default="")
     parser.add_argument("--device", type=str, default="")
     parser.add_argument("--num-workers", type=int, default=None)
     return parser.parse_args()
@@ -255,6 +256,45 @@ def save_json(path: Path, payload: Dict) -> None:
         json.dump(payload, fp, ensure_ascii=False, indent=2)
 
 
+def save_interrupt_state(
+    run_dir: Path,
+    checkpoint_dir: str | Path,
+    run_checkpoint_dir: Path,
+    model,
+    optimizer,
+    scheduler,
+    scaler,
+    resume_epoch: int,
+    current_epoch: int,
+    current_phase: str,
+    current_step: int,
+    global_step: int,
+    optimizer_step: int,
+    config: Dict,
+) -> Dict:
+    interrupt_state = {
+        "interrupted": True,
+        "current_epoch": current_epoch + 1 if current_epoch >= 0 else 0,
+        "phase": current_phase,
+        "step_in_phase": current_step,
+        "global_step": global_step,
+        "optimizer_step": optimizer_step,
+        "resume_epoch_index": resume_epoch,
+        "resume_next_epoch": max(resume_epoch + 2, 1),
+    }
+    save_json(run_dir / "interrupt_state.json", interrupt_state)
+
+    interrupt_path = Path(checkpoint_dir) / "interrupt_last.pt"
+    run_interrupt_path = run_checkpoint_dir / "interrupt_last.pt"
+    save_checkpoint(model, optimizer, scheduler, scaler, resume_epoch, config, interrupt_path)
+    save_checkpoint(model, optimizer, scheduler, scaler, resume_epoch, config, run_interrupt_path)
+    return {
+        "interrupt_path": str(interrupt_path),
+        "run_interrupt_path": str(run_interrupt_path),
+        "resume_next_epoch": int(interrupt_state["resume_next_epoch"]),
+    }
+
+
 def build_scheduler(optimizer: torch.optim.Optimizer, train_cfg: Dict):
     total_epochs = max(int(train_cfg["epochs"]), 1)
     warmup_epochs = max(int(train_cfg.get("warmup_epochs", 0)), 0)
@@ -291,7 +331,7 @@ def step_scheduler(scheduler) -> None:
         return
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="The epoch parameter in `scheduler.step()` was not necessary.*")
-        step_scheduler(scheduler)
+        scheduler.step()
 
 
 def build_class_balanced_sampler(
@@ -419,6 +459,17 @@ def build_dataloaders(config: Dict):
         brightness=augment_cfg["brightness"],
         contrast=augment_cfg["contrast"],
         saturation=augment_cfg["saturation"],
+        lowlight_aug_prob=augment_cfg.get("lowlight_aug_prob", 0.0),
+        lowlight_gamma_min=augment_cfg.get("lowlight_gamma_min", 1.4),
+        lowlight_gamma_max=augment_cfg.get("lowlight_gamma_max", 2.2),
+        weak_modality_prob=augment_cfg.get("weak_modality_prob", 0.0),
+        weak_rgb_primary_prob=augment_cfg.get("weak_rgb_primary_prob", 0.7),
+        weak_modality_min_scale=augment_cfg.get("weak_modality_min_scale", 0.05),
+        weak_modality_max_scale=augment_cfg.get("weak_modality_max_scale", 0.35),
+        weak_modality_blur_prob=augment_cfg.get("weak_modality_blur_prob", 0.5),
+        weak_modality_noise_std=augment_cfg.get("weak_modality_noise_std", 0.03),
+        motion_blur_prob=augment_cfg.get("motion_blur_prob", 0.0),
+        motion_blur_kernel_sizes=tuple(augment_cfg.get("motion_blur_kernel_sizes", [3, 5, 7])),
     )
 
     train_dataset = RGBTTargetDataset(
@@ -498,6 +549,13 @@ def validate(model, data_loader, device, num_classes: int, small_object_area: fl
     return metrics
 
 
+def resolve_checkpoint_arg(cli_value: str, config_value: str, project_root: Path) -> str:
+    value = cli_value or config_value or ""
+    if not value:
+        return ""
+    return resolve_path(project_root, value)
+
+
 def main():
     args = parse_args()
     config = load_config(args.config)
@@ -541,6 +599,11 @@ def main():
     start_epoch = 0
     completed_epochs = 0
     checkpoint = None
+    init_checkpoint = resolve_checkpoint_arg(
+        args.init_checkpoint,
+        config.get("train", {}).get("init_checkpoint", ""),
+        PROJECT_ROOT,
+    )
     resume_history_compatible = True
     if args.resume:
         checkpoint = load_checkpoint(
@@ -556,6 +619,14 @@ def main():
         resume_history_compatible = is_resume_history_compatible(checkpoint.get("config"), config)
         if checkpoint.get("scheduler_state_dict") is None:
             advance_scheduler_for_resume(scheduler, completed_epochs)
+    elif init_checkpoint:
+        checkpoint = load_checkpoint(model, init_checkpoint, map_location=device, strict=False)
+        log_line(log_file, f"init_from={init_checkpoint} weights_only_init=true")
+        missing_keys = checkpoint.get("_load_state_dict_missing_keys", [])
+        unexpected_keys = checkpoint.get("_load_state_dict_unexpected_keys", [])
+        if missing_keys or unexpected_keys:
+            log_line(log_file, f"init_missing_keys={missing_keys}")
+            log_line(log_file, f"init_unexpected_keys={unexpected_keys}")
 
     epoch_history = []
     best_map50 = 0.0
@@ -566,6 +637,10 @@ def main():
     optimizer_step = math.ceil(len(train_loader) / accumulate_steps) * completed_epochs
     show_live_progress = supports_live_progress(sys.stdout)
     log_interval = max(1, config["train"].get("log_interval", 10))
+    current_epoch = start_epoch - 1
+    current_step = 0
+    current_phase = "idle"
+    epoch_in_progress = False
     log_line(log_file, f"run_dir={run_dir}")
     log_line(log_file, f"device={device}")
     log_line(log_file, f"train_samples={len(train_loader.dataset)} val_samples={len(val_loader.dataset)}")
@@ -587,133 +662,174 @@ def main():
         )
         if not resume_history_compatible:
             log_line(log_file, "resume_history_reset=true reason=dataset_config_changed")
-    for epoch in range(start_epoch, config["train"]["epochs"]):
-        model.train()
-        epoch_loss = 0.0
-        epoch_total = len(train_loader)
-        optimizer.zero_grad(set_to_none=True)
-        if not show_live_progress:
-            print(
-                f"epoch={epoch + 1} phase=train status=started total_steps={epoch_total}",
-                flush=True,
+    try:
+        for epoch in range(start_epoch, config["train"]["epochs"]):
+            current_epoch = epoch
+            current_step = 0
+            current_phase = "train"
+            epoch_in_progress = True
+            model.train()
+            epoch_loss = 0.0
+            epoch_total = len(train_loader)
+            optimizer.zero_grad(set_to_none=True)
+            if not show_live_progress:
+                print(
+                    f"epoch={epoch + 1} phase=train status=started total_steps={epoch_total}",
+                    flush=True,
+                )
+            progress = tqdm(
+                train_loader,
+                desc=f"Epoch {epoch + 1}/{config['train']['epochs']}",
+                disable=not show_live_progress,
             )
-        progress = tqdm(
-            train_loader,
-            desc=f"Epoch {epoch + 1}/{config['train']['epochs']}",
-            disable=not show_live_progress,
-        )
-        for step, batch in enumerate(progress, start=1):
-            rgb = [tensor.to(device) for tensor in batch["rgb"]]
-            thermal = [tensor.to(device) for tensor in batch["thermal"]]
-            targets = move_targets_to_device(batch["targets"], device)
+            for step, batch in enumerate(progress, start=1):
+                current_step = step
+                rgb = [tensor.to(device) for tensor in batch["rgb"]]
+                thermal = [tensor.to(device) for tensor in batch["thermal"]]
+                targets = move_targets_to_device(batch["targets"], device)
 
-            with torch.amp.autocast(device_type=device.type, enabled=scaler.is_enabled()):
-                loss_dict = model(rgb, thermal, targets)
-                total_loss = aggregator(loss_dict, targets)
-            loss_to_backprop = total_loss / accumulate_steps
-            scaler.scale(loss_to_backprop).backward()
+                with torch.amp.autocast(device_type=device.type, enabled=scaler.is_enabled()):
+                    loss_dict = model(rgb, thermal, targets)
+                    total_loss = aggregator(loss_dict, targets)
+                loss_to_backprop = total_loss / accumulate_steps
+                scaler.scale(loss_to_backprop).backward()
 
-            should_step = step % accumulate_steps == 0 or step == epoch_total
-            if should_step:
-                scaler.step(optimizer)
-                scaler.update()
-                optimizer.zero_grad(set_to_none=True)
-                optimizer_step += 1
+                should_step = step % accumulate_steps == 0 or step == epoch_total
+                if should_step:
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad(set_to_none=True)
+                    optimizer_step += 1
 
-            epoch_loss += float(total_loss.item())
-            avg_loss = epoch_loss / step
-            global_step += 1
-            if show_live_progress:
-                progress.set_postfix(loss=f"{avg_loss:.4f}", lr=f"{optimizer.param_groups[0]['lr']:.6f}")
-            if step == 1 or step % log_interval == 0 or step == epoch_total:
-                step_row = {
-                    "epoch": epoch + 1,
-                    "step": step,
-                    "global_step": global_step,
-                    "optimizer_step": optimizer_step,
-                    "accumulate_steps": accumulate_steps,
-                    "optimizer_updated": int(should_step),
-                    "loss": round(float(total_loss.item()), 6),
-                    "avg_loss": round(float(avg_loss), 6),
-                    "lr": round(float(optimizer.param_groups[0]["lr"]), 10),
-                }
-                append_csv(run_dir / "train_steps.csv", step_row)
-                append_jsonl(run_dir / "train_steps.jsonl", step_row)
-                if not show_live_progress:
-                    print(
-                        f"epoch={epoch + 1} phase=train step={step}/{epoch_total} "
-                        f"global_step={global_step} optimizer_step={optimizer_step} "
-                        f"loss={step_row['loss']:.4f} "
-                        f"avg_loss={step_row['avg_loss']:.4f} lr={step_row['lr']:.6f}",
-                        flush=True,
-                    )
+                epoch_loss += float(total_loss.item())
+                avg_loss = epoch_loss / step
+                global_step += 1
+                if show_live_progress:
+                    progress.set_postfix(loss=f"{avg_loss:.4f}", lr=f"{optimizer.param_groups[0]['lr']:.6f}")
+                if step == 1 or step % log_interval == 0 or step == epoch_total:
+                    step_row = {
+                        "epoch": epoch + 1,
+                        "step": step,
+                        "global_step": global_step,
+                        "optimizer_step": optimizer_step,
+                        "accumulate_steps": accumulate_steps,
+                        "optimizer_updated": int(should_step),
+                        "loss": round(float(total_loss.item()), 6),
+                        "avg_loss": round(float(avg_loss), 6),
+                        "lr": round(float(optimizer.param_groups[0]["lr"]), 10),
+                    }
+                    append_csv(run_dir / "train_steps.csv", step_row)
+                    append_jsonl(run_dir / "train_steps.jsonl", step_row)
+                    if not show_live_progress:
+                        print(
+                            f"epoch={epoch + 1} phase=train step={step}/{epoch_total} "
+                            f"global_step={global_step} optimizer_step={optimizer_step} "
+                            f"loss={step_row['loss']:.4f} "
+                            f"avg_loss={step_row['avg_loss']:.4f} lr={step_row['lr']:.6f}",
+                            flush=True,
+                        )
 
-        scheduler.step()
-        if not show_live_progress:
-            print(
-                f"epoch={epoch + 1} phase=validate status=started batches={len(val_loader)}",
-                flush=True,
+            step_scheduler(scheduler)
+            current_phase = "validate"
+            current_step = 0
+            if not show_live_progress:
+                print(
+                    f"epoch={epoch + 1} phase=validate status=started batches={len(val_loader)}",
+                    flush=True,
+                )
+
+            metrics = validate(
+                model,
+                val_loader,
+                device,
+                num_classes=config["model"]["num_classes"],
+                small_object_area=config["train"]["small_object_area"],
+                show_progress=show_live_progress,
             )
+            if not show_live_progress:
+                print(
+                    f"epoch={epoch + 1} phase=validate status=completed "
+                    f"map50={metrics.map50:.4f} recall50={metrics.recall50:.4f} "
+                    f"small_recall50={metrics.small_recall50:.4f} "
+                    f"tp={metrics.true_positives} fp={metrics.false_positives} fn={metrics.false_negatives}",
+                    flush=True,
+                )
 
-        metrics = validate(
-            model,
-            val_loader,
-            device,
-            num_classes=config["model"]["num_classes"],
-            small_object_area=config["train"]["small_object_area"],
-            show_progress=show_live_progress,
-        )
-        if not show_live_progress:
-            print(
-                f"epoch={epoch + 1} phase=validate status=completed "
-                f"map50={metrics.map50:.4f} recall50={metrics.recall50:.4f} "
-                f"small_recall50={metrics.small_recall50:.4f} "
-                f"tp={metrics.true_positives} fp={metrics.false_positives} fn={metrics.false_negatives}",
-                flush=True,
+            current_phase = "checkpoint"
+            latest_path = Path(config["train"]["checkpoint_dir"]) / "last.pt"
+            run_latest_path = run_checkpoint_dir / "last.pt"
+            save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, latest_path)
+            save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, run_latest_path)
+            if metrics.map50 >= best_map50:
+                best_map50 = metrics.map50
+                best_path = Path(config["train"]["checkpoint_dir"]) / "best.pt"
+                run_best_path = run_checkpoint_dir / "best.pt"
+                save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, best_path)
+                save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, run_best_path)
+
+            epoch_row = {
+                "epoch": epoch + 1,
+                "train_loss": round(epoch_loss / max(len(train_loader), 1), 6),
+                "map50": round(metrics.map50, 6),
+                "recall50": round(metrics.recall50, 6),
+                "small_recall50": round(metrics.small_recall50, 6),
+                "true_positives": int(metrics.true_positives),
+                "false_positives": int(metrics.false_positives),
+                "false_negatives": int(metrics.false_negatives),
+                "lr": round(float(optimizer.param_groups[0]["lr"]), 10),
+            }
+            epoch_history.append(epoch_row)
+            append_csv(run_dir / "epoch_metrics.csv", epoch_row)
+            append_jsonl(run_dir / "epoch_metrics.jsonl", epoch_row)
+            with (run_dir / "latest_metrics.json").open("w", encoding="utf-8") as fp:
+                json.dump(epoch_row, fp, ensure_ascii=False, indent=2)
+            plot_training_curves(epoch_history, run_dir)
+
+            summary_line = (
+                f"epoch={epoch + 1} "
+                f"train_loss={epoch_row['train_loss']:.4f} "
+                f"map50={epoch_row['map50']:.4f} "
+                f"recall50={epoch_row['recall50']:.4f} "
+                f"small_recall50={epoch_row['small_recall50']:.4f} "
+                f"tp={epoch_row['true_positives']} "
+                f"fp={epoch_row['false_positives']} "
+                f"fn={epoch_row['false_negatives']} "
+                f"lr={epoch_row['lr']:.6f}"
             )
-
-        latest_path = Path(config["train"]["checkpoint_dir"]) / "last.pt"
-        run_latest_path = run_checkpoint_dir / "last.pt"
-        save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, latest_path)
-        save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, run_latest_path)
-        if metrics.map50 >= best_map50:
-            best_map50 = metrics.map50
-            best_path = Path(config["train"]["checkpoint_dir"]) / "best.pt"
-            run_best_path = run_checkpoint_dir / "best.pt"
-            save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, best_path)
-            save_checkpoint(model, optimizer, scheduler, scaler, epoch, config, run_best_path)
-
-        epoch_row = {
-            "epoch": epoch + 1,
-            "train_loss": round(epoch_loss / max(len(train_loader), 1), 6),
-            "map50": round(metrics.map50, 6),
-            "recall50": round(metrics.recall50, 6),
-            "small_recall50": round(metrics.small_recall50, 6),
-            "true_positives": int(metrics.true_positives),
-            "false_positives": int(metrics.false_positives),
-            "false_negatives": int(metrics.false_negatives),
-            "lr": round(float(optimizer.param_groups[0]["lr"]), 10),
-        }
-        epoch_history.append(epoch_row)
-        append_csv(run_dir / "epoch_metrics.csv", epoch_row)
-        append_jsonl(run_dir / "epoch_metrics.jsonl", epoch_row)
-        with (run_dir / "latest_metrics.json").open("w", encoding="utf-8") as fp:
-            json.dump(epoch_row, fp, ensure_ascii=False, indent=2)
-        plot_training_curves(epoch_history, run_dir)
-
-        summary_line = (
-            f"epoch={epoch + 1} "
-            f"train_loss={epoch_row['train_loss']:.4f} "
-            f"map50={epoch_row['map50']:.4f} "
-            f"recall50={epoch_row['recall50']:.4f} "
-            f"small_recall50={epoch_row['small_recall50']:.4f} "
-            f"tp={epoch_row['true_positives']} "
-            f"fp={epoch_row['false_positives']} "
-            f"fn={epoch_row['false_negatives']} "
-            f"lr={epoch_row['lr']:.6f}"
+            log_line(log_file, summary_line)
+            print(summary_line, flush=True)
+            current_phase = "idle"
+            current_step = 0
+            epoch_in_progress = False
+    except KeyboardInterrupt:
+        resume_epoch = current_epoch - 1 if epoch_in_progress else current_epoch
+        interrupt_artifacts = save_interrupt_state(
+            run_dir=run_dir,
+            checkpoint_dir=config["train"]["checkpoint_dir"],
+            run_checkpoint_dir=run_checkpoint_dir,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            scaler=scaler,
+            resume_epoch=resume_epoch,
+            current_epoch=current_epoch,
+            current_phase=current_phase,
+            current_step=current_step,
+            global_step=global_step,
+            optimizer_step=optimizer_step,
+            config=config,
         )
-        log_line(log_file, summary_line)
-        print(summary_line, flush=True)
+        interrupt_line = (
+            f"interrupted=true phase={current_phase} "
+            f"epoch_in_progress={current_epoch + 1 if current_epoch >= 0 else 0} "
+            f"step_in_progress={current_step} "
+            f"resume_next_epoch={interrupt_artifacts['resume_next_epoch']}"
+        )
+        log_line(log_file, interrupt_line)
+        log_line(log_file, f"interrupt_checkpoint={interrupt_artifacts['interrupt_path']}")
+        log_line(log_file, f"interrupt_run_checkpoint={interrupt_artifacts['run_interrupt_path']}")
+        print(interrupt_line, flush=True)
+        print(f"interrupt_checkpoint={interrupt_artifacts['interrupt_path']}", flush=True)
 
 
 if __name__ == "__main__":

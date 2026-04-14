@@ -1,0 +1,29 @@
+model: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs/official_rgb_trueobb_stage1_stable_v1/weights/best.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/yolo_obb_official_rgb_trueobb_v1/dataset.yaml
+
+train:
+  epochs: 20
+  imgsz: 640
+  batch: 4
+  device: 0
+  workers: 0
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs
+  name: official_rgb_model_refined_stage2_v1
+  pretrained: true
+  resume: false
+  optimizer: auto
+  lr0: 0.001
+  cos_lr: true
+  patience: 15
+  degrees: 0.0
+  scale: 0.5
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+  close_mosaic: 5
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false

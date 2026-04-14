@@ -44,10 +44,24 @@ class Predictor:
         result_min_confidence: float = 0.0,
         result_merge_distance: float = 0.0,
         result_merge_degenerate_size: float = 2.0,
+        result_duplicate_iou: float = 0.0,
+        result_containment_ratio: float = 0.0,
+        result_duplicate_center_distance: float = 0.0,
+        result_box_expand_ratio: float = 0.0,
+        result_box_expand_min_pixels: float = 0.0,
+        result_box_pad_left: float = 0.0,
+        result_box_pad_top: float = 0.0,
+        result_box_pad_right: float = 0.0,
+        result_box_pad_bottom: float = 0.0,
         model_version: str = "rgbt_detector_v1",
         input_size: int = 640,
         preprocess_mode: str = "stretch",
         letterbox_pad_value: int = 114,
+        enable_rgb_lowlight_enhance: bool = False,
+        rgb_lowlight_luma_threshold: float = 70.0,
+        rgb_lowlight_gamma: float = 1.15,
+        rgb_lowlight_clahe_clip_limit: float = 2.0,
+        rgb_lowlight_confidence_scale: float = 0.75,
     ):
         self.model = model
         self.class_mapping = class_mapping
@@ -57,13 +71,28 @@ class Predictor:
         self.result_min_confidence = result_min_confidence
         self.result_merge_distance = result_merge_distance
         self.result_merge_degenerate_size = result_merge_degenerate_size
+        self.result_duplicate_iou = result_duplicate_iou
+        self.result_containment_ratio = result_containment_ratio
+        self.result_duplicate_center_distance = result_duplicate_center_distance
+        self.result_box_expand_ratio = result_box_expand_ratio
+        self.result_box_expand_min_pixels = result_box_expand_min_pixels
+        self.result_box_pad_left = result_box_pad_left
+        self.result_box_pad_top = result_box_pad_top
+        self.result_box_pad_right = result_box_pad_right
+        self.result_box_pad_bottom = result_box_pad_bottom
         self.model_version = model_version
         self.input_size = input_size
         self.preprocess_mode = preprocess_mode
         self.letterbox_pad_value = int(letterbox_pad_value)
+        self.enable_rgb_lowlight_enhance = bool(enable_rgb_lowlight_enhance)
+        self.rgb_lowlight_luma_threshold = float(rgb_lowlight_luma_threshold)
+        self.rgb_lowlight_gamma = float(rgb_lowlight_gamma)
+        self.rgb_lowlight_clahe_clip_limit = float(rgb_lowlight_clahe_clip_limit)
+        self.rgb_lowlight_confidence_scale = float(rgb_lowlight_confidence_scale)
         self.engine = TorchInferenceEngine(model, device)
         self.last_rgb_image = None
         self._last_resize_meta = None
+        self._last_lowlight_applied = False
 
     @classmethod
     def from_deploy_config(cls, config_path: str | Path) -> "Predictor":
@@ -90,6 +119,15 @@ class Predictor:
         result_min_confidence = float(deploy_cfg.get("result_min_confidence", 0.0))
         result_merge_distance = float(deploy_cfg.get("result_merge_distance", 0.0))
         result_merge_degenerate_size = float(deploy_cfg.get("result_merge_degenerate_size", 2.0))
+        result_duplicate_iou = float(deploy_cfg.get("result_duplicate_iou", 0.0))
+        result_containment_ratio = float(deploy_cfg.get("result_containment_ratio", 0.0))
+        result_duplicate_center_distance = float(deploy_cfg.get("result_duplicate_center_distance", 0.0))
+        result_box_expand_ratio = float(deploy_cfg.get("result_box_expand_ratio", 0.0))
+        result_box_expand_min_pixels = float(deploy_cfg.get("result_box_expand_min_pixels", 0.0))
+        result_box_pad_left = float(deploy_cfg.get("result_box_pad_left", 0.0))
+        result_box_pad_top = float(deploy_cfg.get("result_box_pad_top", 0.0))
+        result_box_pad_right = float(deploy_cfg.get("result_box_pad_right", 0.0))
+        result_box_pad_bottom = float(deploy_cfg.get("result_box_pad_bottom", 0.0))
         checkpoint = None
         if model_path.exists():
             checkpoint = torch.load(model_path, map_location=device, weights_only=False)
@@ -116,10 +154,24 @@ class Predictor:
             result_min_confidence=result_min_confidence,
             result_merge_distance=result_merge_distance,
             result_merge_degenerate_size=result_merge_degenerate_size,
+            result_duplicate_iou=result_duplicate_iou,
+            result_containment_ratio=result_containment_ratio,
+            result_duplicate_center_distance=result_duplicate_center_distance,
+            result_box_expand_ratio=result_box_expand_ratio,
+            result_box_expand_min_pixels=result_box_expand_min_pixels,
+            result_box_pad_left=result_box_pad_left,
+            result_box_pad_top=result_box_pad_top,
+            result_box_pad_right=result_box_pad_right,
+            result_box_pad_bottom=result_box_pad_bottom,
             model_version=model_path.stem if model_path.exists() else "untrained",
             input_size=config["model"].get("input_size", 640),
             preprocess_mode=config.get("dataset", {}).get("resize_mode", "stretch"),
             letterbox_pad_value=config.get("dataset", {}).get("letterbox_pad_value", 114),
+            enable_rgb_lowlight_enhance=bool(deploy_cfg.get("enable_rgb_lowlight_enhance", False)),
+            rgb_lowlight_luma_threshold=float(deploy_cfg.get("rgb_lowlight_luma_threshold", 70.0)),
+            rgb_lowlight_gamma=float(deploy_cfg.get("rgb_lowlight_gamma", 1.15)),
+            rgb_lowlight_clahe_clip_limit=float(deploy_cfg.get("rgb_lowlight_clahe_clip_limit", 2.0)),
+            rgb_lowlight_confidence_scale=float(deploy_cfg.get("rgb_lowlight_confidence_scale", 0.75)),
         )
 
     def _prepare_tensors(self, rgb_bytes: bytes, thermal_bytes: bytes):
@@ -132,7 +184,7 @@ class Predictor:
         thermal_image = self._ensure_thermal_array(thermal_image)
         rgb_image, thermal_image = ensure_same_size(rgb_image, thermal_image)
         self.last_rgb_image = rgb_image
-        prepared_rgb = rgb_image
+        prepared_rgb = self._maybe_enhance_lowlight_rgb(rgb_image)
         prepared_thermal = thermal_image
         resize_meta = None
         if self.preprocess_mode == "stretch":
@@ -157,6 +209,23 @@ class Predictor:
         rgb_tensor = image_to_tensor(prepared_rgb)
         thermal_tensor = image_to_tensor(prepared_thermal)
         return rgb_image, rgb_tensor, thermal_tensor
+
+    def _maybe_enhance_lowlight_rgb(self, image_rgb: np.ndarray) -> np.ndarray:
+        self._last_lowlight_applied = False
+        if not self.enable_rgb_lowlight_enhance:
+            return image_rgb
+        luma = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2GRAY).mean()
+        if luma >= self.rgb_lowlight_luma_threshold:
+            return image_rgb
+        self._last_lowlight_applied = True
+        lab = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2LAB)
+        l_channel, a_channel, b_channel = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=self.rgb_lowlight_clahe_clip_limit, tileGridSize=(8, 8))
+        l_channel = clahe.apply(l_channel)
+        enhanced = cv2.cvtColor(cv2.merge([l_channel, a_channel, b_channel]), cv2.COLOR_LAB2RGB)
+        gamma = max(self.rgb_lowlight_gamma, 1e-6)
+        table = np.array([((idx / 255.0) ** (1.0 / gamma)) * 255.0 for idx in range(256)]).clip(0, 255).astype(np.uint8)
+        return cv2.LUT(enhanced, table)
 
     @staticmethod
     def _ensure_rgb_array(image: np.ndarray) -> np.ndarray:
@@ -207,6 +276,7 @@ class Predictor:
         elapsed = time.perf_counter() - start
 
         raw_detections = self._build_detections(output)
+        raw_detections = self._expand_detections_to_image(raw_detections, rgb_image.shape[:2])
         detections = self._postprocess_detections(raw_detections)
 
         return {
@@ -246,18 +316,73 @@ class Predictor:
             )
         return detections
 
+    def _expand_detections_to_image(self, detections: List[Dict], image_hw: tuple[int, int]) -> List[Dict]:
+        if (
+            self.result_box_expand_ratio <= 0
+            and self.result_box_expand_min_pixels <= 0
+            and self.result_box_pad_left == 0
+            and self.result_box_pad_top == 0
+            and self.result_box_pad_right == 0
+            and self.result_box_pad_bottom == 0
+        ):
+            return detections
+        image_h, image_w = image_hw
+        expanded: List[Dict] = []
+        for item in detections:
+            clone = dict(item)
+            x1, y1, x2, y2 = [float(v) for v in clone["bbox"]]
+            width = max(0.0, x2 - x1)
+            height = max(0.0, y2 - y1)
+            expand_x = max(width * self.result_box_expand_ratio * 0.5, self.result_box_expand_min_pixels)
+            expand_y = max(height * self.result_box_expand_ratio * 0.5, self.result_box_expand_min_pixels)
+            x1 = max(0.0, x1 - expand_x - self.result_box_pad_left)
+            y1 = max(0.0, y1 - expand_y - self.result_box_pad_top)
+            x2 = min(float(max(image_w - 1, 0)), x2 + expand_x + self.result_box_pad_right)
+            y2 = min(float(max(image_h - 1, 0)), y2 + expand_y + self.result_box_pad_bottom)
+            clone["bbox"] = [round(x1, 2), round(y1, 2), round(x2, 2), round(y2, 2)]
+            expanded.append(clone)
+        return expanded
+
     def _postprocess_detections(self, detections: List[Dict]) -> List[Dict]:
         filtered = [item for item in detections if item["confidence"] >= self.result_min_confidence]
-        if self.result_merge_distance <= 0:
-            return filtered
+        if not filtered and self._last_lowlight_applied:
+            relaxed_threshold = self.result_min_confidence * self.rgb_lowlight_confidence_scale
+            filtered = [item for item in detections if item["confidence"] >= relaxed_threshold]
 
         kept: List[Dict] = []
         for item in sorted(filtered, key=lambda det: det["confidence"], reverse=True):
-            if not self._is_duplicate_degenerate_detection(item, kept):
+            merge_index = self._find_merge_target_index(item, kept)
+            if merge_index is not None:
+                kept[merge_index] = self._merge_duplicate_detection(kept[merge_index], item)
+                continue
+            if not self._is_redundant_detection(item, kept):
                 kept.append(item)
         return kept
 
-    def _is_duplicate_degenerate_detection(self, item: Dict, kept: List[Dict]) -> bool:
+    def _find_merge_target_index(self, item: Dict, kept: List[Dict]) -> Optional[int]:
+        if self.result_merge_distance <= 0 and self.result_duplicate_iou <= 0 and self.result_containment_ratio <= 0:
+            return None
+        for idx, existing in enumerate(kept):
+            if item["class_id"] != existing["class_id"]:
+                continue
+            if self._is_overlap_duplicate(item, existing):
+                return idx
+        return None
+
+    def _merge_duplicate_detection(self, existing: Dict, incoming: Dict) -> Dict:
+        existing_area = self._box_area(existing["bbox"])
+        incoming_area = self._box_area(incoming["bbox"])
+        if incoming_area > existing_area:
+            preferred = dict(incoming)
+            preferred["confidence"] = round(max(float(existing["confidence"]), float(incoming["confidence"])), 4)
+            return preferred
+        merged = dict(existing)
+        merged["confidence"] = round(max(float(existing["confidence"]), float(incoming["confidence"])), 4)
+        return merged
+
+    def _is_redundant_detection(self, item: Dict, kept: List[Dict]) -> bool:
+        if self.result_merge_distance <= 0 and self.result_duplicate_iou <= 0 and self.result_containment_ratio <= 0:
+            return False
         x1, y1, x2, y2 = item["bbox"]
         center_x = (x1 + x2) / 2.0
         center_y = (y1 + y2) / 2.0
@@ -265,22 +390,66 @@ class Predictor:
         for existing in kept:
             if item["class_id"] != existing["class_id"]:
                 continue
-            existing_is_degenerate = self._is_degenerate_box(existing["bbox"])
-            if not (item_is_degenerate or existing_is_degenerate):
-                continue
-            ex1, ey1, ex2, ey2 = existing["bbox"]
-            existing_center_x = (ex1 + ex2) / 2.0
-            existing_center_y = (ey1 + ey2) / 2.0
-            if (
-                abs(center_x - existing_center_x) <= self.result_merge_distance
-                and abs(center_y - existing_center_y) <= self.result_merge_distance
-            ):
+            if item_is_degenerate and self._is_overlap_duplicate(item, existing):
                 return True
+        return False
+
+    def _is_overlap_duplicate(self, item: Dict, existing: Dict) -> bool:
+        x1, y1, x2, y2 = item["bbox"]
+        center_x = (x1 + x2) / 2.0
+        center_y = (y1 + y2) / 2.0
+        existing_is_degenerate = self._is_degenerate_box(existing["bbox"])
+        ex1, ey1, ex2, ey2 = existing["bbox"]
+        existing_center_x = (ex1 + ex2) / 2.0
+        existing_center_y = (ey1 + ey2) / 2.0
+        center_distance_ok = (
+            self.result_duplicate_center_distance <= 0
+            or (
+                abs(center_x - existing_center_x) <= self.result_duplicate_center_distance
+                and abs(center_y - existing_center_y) <= self.result_duplicate_center_distance
+            )
+        )
+
+        item_is_degenerate = self._is_degenerate_box(item["bbox"])
+        if item_is_degenerate or existing_is_degenerate:
+            return (
+                self.result_merge_distance > 0
+                and abs(center_x - existing_center_x) <= self.result_merge_distance
+                and abs(center_y - existing_center_y) <= self.result_merge_distance
+            )
+
+        intersection = self._intersection_area(item["bbox"], existing["bbox"])
+        if intersection <= 0:
+            return False
+        item_area = self._box_area(item["bbox"])
+        existing_area = self._box_area(existing["bbox"])
+        union = item_area + existing_area - intersection
+        iou = intersection / max(union, 1e-6)
+        containment = intersection / max(min(item_area, existing_area), 1e-6)
+        if self.result_duplicate_iou > 0 and iou >= self.result_duplicate_iou:
+            return True
+        if self.result_containment_ratio > 0 and containment >= self.result_containment_ratio and center_distance_ok:
+            return True
         return False
 
     def _is_degenerate_box(self, bbox: List[float]) -> bool:
         x1, y1, x2, y2 = bbox
         return (x2 - x1) <= self.result_merge_degenerate_size or (y2 - y1) <= self.result_merge_degenerate_size
+
+    @staticmethod
+    def _box_area(bbox: List[float]) -> float:
+        x1, y1, x2, y2 = bbox
+        return max(0.0, x2 - x1) * max(0.0, y2 - y1)
+
+    @staticmethod
+    def _intersection_area(box_a: List[float], box_b: List[float]) -> float:
+        ax1, ay1, ax2, ay2 = box_a
+        bx1, by1, bx2, by2 = box_b
+        inter_x1 = max(ax1, bx1)
+        inter_y1 = max(ay1, by1)
+        inter_x2 = min(ax2, bx2)
+        inter_y2 = min(ay2, by2)
+        return max(0.0, inter_x2 - inter_x1) * max(0.0, inter_y2 - inter_y1)
 
     def health(self) -> Dict:
         return {

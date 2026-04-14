@@ -129,12 +129,15 @@ async def detect_from_stream(
 def start_video_session(payload: VideoSessionStartRequest):
     try:
         API_LOGGER.info(
-            "start_video_session session_id=%s source_url=%s bucket=%s object_key=%s callback_url=%s",
+            "start_video_session session_id=%s source_url=%s bucket=%s object_key=%s callback_url=%s callback_min_interval_ms=%s frame_width=%s frame_height=%s",
             payload.session_id,
             payload.source_url,
             payload.bucket,
             payload.object_key,
             payload.result_callback_url,
+            payload.callback_min_interval_ms,
+            payload.frame_width,
+            payload.frame_height,
         )
         result = get_stream_manager().start_session(
             session_id=payload.session_id,
@@ -145,8 +148,11 @@ def start_video_session(payload: VideoSessionStartRequest):
             rgb_position=payload.rgb_position or VIDEO_SESSION_DEFAULT_RGB_POSITION,
             callback_url=payload.result_callback_url,
             callback_token=payload.callback_token,
+            callback_min_interval_ms=payload.callback_min_interval_ms,
             bucket=payload.bucket,
             object_key=payload.object_key,
+            frame_width=payload.frame_width,
+            frame_height=payload.frame_height,
         )
         return result
     except ValueError as exc:
@@ -158,24 +164,35 @@ def start_video_session(payload: VideoSessionStartRequest):
 def start_stream_session(payload: StreamSessionStartRequest):
     try:
         API_LOGGER.info(
-            "start_stream_session session_id=%s source_url=%s app=%s stream_key=%s callback_url=%s",
+            "start_stream_session session_id=%s source_url=%s rgb_pull_url=%s ir_pull_url=%s app=%s stream_key=%s callback_url=%s callback_min_interval_ms=%s sample_fps=%s frame_width=%s frame_height=%s",
             payload.session_id,
             payload.source_url,
+            payload.rgb_pull_url,
+            payload.ir_pull_url,
             payload.app,
             payload.stream_key,
             payload.result_callback_url,
+            payload.callback_min_interval_ms,
+            payload.sample_fps,
+            payload.frame_width,
+            payload.frame_height,
         )
         result = get_stream_manager().start_session(
             session_id=payload.session_id,
             source_type="stream",
             source_url=payload.source_url,
+            rgb_pull_url=payload.rgb_pull_url,
+            ir_pull_url=payload.ir_pull_url,
             sample_fps=payload.sample_fps,
             pair_layout=payload.pair_layout,
             rgb_position=payload.rgb_position,
             callback_url=payload.result_callback_url,
             callback_token=payload.callback_token,
+            callback_min_interval_ms=payload.callback_min_interval_ms,
             app=payload.app,
             stream_key=payload.stream_key,
+            frame_width=payload.frame_width,
+            frame_height=payload.frame_height,
         )
         return result
     except ValueError as exc:

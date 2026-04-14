@@ -13,3 +13,4 @@ logs/
 *.onnx
 *.pt
 *.pth
+tmp/

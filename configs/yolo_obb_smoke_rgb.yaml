@@ -1,0 +1,28 @@
+model: yolo11n-obb.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/yolo_obb_rgb_expand_refined/dataset.yaml
+
+train:
+  epochs: 20
+  imgsz: 640
+  batch: 4
+  device: 0
+  workers: 0
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs
+  name: smoke_rgb_expand_refined_v1
+  pretrained: true
+  optimizer: auto
+  lr0: 0.01
+  cos_lr: true
+  patience: 20
+  degrees: 0.0
+  scale: 0.5
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+  close_mosaic: 5
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false

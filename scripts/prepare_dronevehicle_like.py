@@ -23,6 +23,7 @@ RAW_NAME_TO_CLASS = {
     "truck": "truck",
     "bus": "bus",
     "van": "van",
+    "feright": "freight_car",
     "freight car": "freight_car",
     "feright car": "freight_car",
     "feright_car": "freight_car",
@@ -46,6 +47,18 @@ def parse_args():
         type=str,
         default=str(PROJECT_ROOT / "datasets" / "raw" / "dronevehicle" / "val_unpack" / "val"),
         help="Root containing valimg/valimgr/vallabel/vallabelr.",
+    )
+    parser.add_argument(
+        "--train-source-root",
+        type=str,
+        default="",
+        help="Optional official train root. When set together with --val-source-root, official split is preserved.",
+    )
+    parser.add_argument(
+        "--val-source-root",
+        type=str,
+        default="",
+        help="Optional official validation root. When set together with --train-source-root, official split is preserved.",
     )
     parser.add_argument(
         "--target-root",
@@ -86,6 +99,18 @@ def parse_args():
         default=32.0,
         help="Only merge RGB/Thermal boxes when center distance is within this threshold in pixels.",
     )
+    parser.add_argument(
+        "--bbox-expand-ratio",
+        type=float,
+        default=0.0,
+        help="Expand each target bbox by this ratio around its center after crop.",
+    )
+    parser.add_argument(
+        "--bbox-expand-min-pixels",
+        type=float,
+        default=0.0,
+        help="Minimum expansion applied to each bbox side in pixels after crop.",
+    )
     return parser.parse_args()
 
 
@@ -107,7 +132,10 @@ def parse_annotation(xml_path: Path) -> List[Dict]:
     objects = []
     for obj in tree.findall(".//object"):
         raw_name = (obj.findtext("name") or "").strip()
-        class_name = normalize_class_name(raw_name)
+        try:
+            class_name = normalize_class_name(raw_name)
+        except ValueError:
+            continue
         polygon_node = obj.find("polygon")
         if polygon_node is None:
             continue
@@ -180,6 +208,34 @@ def crop_objects(objects: Sequence[Dict], crop_box: Tuple[int, int, int, int]) -
     return cropped
 
 
+def expand_objects(
+    objects: Sequence[Dict],
+    image_size: Tuple[int, int],
+    expand_ratio: float,
+    min_pixels: float,
+) -> List[Dict]:
+    if expand_ratio <= 0.0 and min_pixels <= 0.0:
+        return [dict(item) for item in objects]
+    image_w, image_h = image_size
+    expanded: List[Dict] = []
+    for item in objects:
+        x1, y1, x2, y2 = [float(v) for v in item["bbox"]]
+        width = max(0.0, x2 - x1)
+        height = max(0.0, y2 - y1)
+        expand_x = max(width * expand_ratio * 0.5, min_pixels)
+        expand_y = max(height * expand_ratio * 0.5, min_pixels)
+        x1 = max(0.0, x1 - expand_x)
+        y1 = max(0.0, y1 - expand_y)
+        x2 = min(float(max(image_w - 1, 0)), x2 + expand_x)
+        y2 = min(float(max(image_h - 1, 0)), y2 + expand_y)
+        if x2 <= x1 or y2 <= y1:
+            continue
+        clone = dict(item)
+        clone["bbox"] = [x1, y1, x2, y2]
+        expanded.append(clone)
+    return expanded
+
+
 def bbox_center(box: Sequence[float]) -> Tuple[float, float]:
     x1, y1, x2, y2 = box
     return (float(x1 + x2) / 2.0, float(y1 + y2) / 2.0)
@@ -246,11 +302,26 @@ def link_or_copy(src: Path, dst: Path, copy_mode: str) -> None:
         shutil.copy2(src, dst)
 
 
+def resolve_source_layout(source_root: Path) -> Tuple[Path, Path, Path, Path]:
+    candidates = [
+        ("valimg", "valimgr", "vallabel", "vallabelr"),
+        ("trainimg", "trainimgr", "trainlabel", "trainlabelr"),
+    ]
+    for rgb_dir, thermal_dir, rgb_ann_dir, thermal_ann_dir in candidates:
+        rgb_root = source_root / rgb_dir
+        thermal_root = source_root / thermal_dir
+        rgb_ann_root = source_root / rgb_ann_dir
+        thermal_ann_root = source_root / thermal_ann_dir
+        if rgb_root.exists() and thermal_root.exists() and rgb_ann_root.exists() and thermal_ann_root.exists():
+            return rgb_root, thermal_root, rgb_ann_root, thermal_ann_root
+    raise FileNotFoundError(
+        f"Unsupported DroneVehicle source layout under {source_root}. "
+        "Expected valimg/valimgr/vallabel/vallabelr or trainimg/trainimgr/trainlabel/trainlabelr."
+    )
+
+
 def collect_samples(source_root: Path) -> List[Dict]:
-    rgb_root = source_root / "valimg"
-    thermal_root = source_root / "valimgr"
-    rgb_ann_root = source_root / "vallabel"
-    thermal_ann_root = source_root / "vallabelr"
+    rgb_root, thermal_root, rgb_ann_root, thermal_ann_root = resolve_source_layout(source_root)
 
     samples = []
     for rgb_path in sorted(rgb_root.glob("*.jpg")):
@@ -316,10 +387,16 @@ def materialize_sample(
     annotation_source: str,
     white_threshold: int,
     merge_max_distance: float,
+    bbox_expand_ratio: float,
+    bbox_expand_min_pixels: float,
     aggregate_stats: Dict[str, float],
-) -> None:
-    rgb_image = load_rgb_image(sample["rgb_path"])
-    thermal_image = load_rgb_image(sample["thermal_path"])
+) -> bool:
+    try:
+        rgb_image = load_rgb_image(sample["rgb_path"])
+        thermal_image = load_rgb_image(sample["thermal_path"])
+    except OSError:
+        aggregate_stats["skipped_corrupt_samples"] += 1
+        return False
     crop_box = pair_content_box(rgb_image, thermal_image, white_threshold)
     transformed = crop_box != (0, 0, rgb_image.width, rgb_image.height)
     if transformed:
@@ -339,6 +416,13 @@ def materialize_sample(
         aggregate_stats["unmatched_primary_objects"] += merge_stats["unmatched_primary_objects"]
         aggregate_stats["unused_secondary_objects"] += merge_stats["unused_secondary_objects"]
 
+    objects = expand_objects(
+        objects,
+        image_size=(rgb_image.width, rgb_image.height),
+        expand_ratio=bbox_expand_ratio,
+        min_pixels=bbox_expand_min_pixels,
+    )
+
     aggregate_stats["samples"] += 1
     aggregate_stats["cropped_samples"] += int(transformed)
     aggregate_stats["rgb_objects"] += len(rgb_objects)
@@ -354,6 +438,7 @@ def materialize_sample(
     save_processed_image(rgb_image, sample["rgb_path"], rgb_target, copy_mode, transformed)
     save_processed_image(thermal_image, sample["thermal_path"], thermal_target, copy_mode, transformed)
     write_annotation(target_root, split, sample["sample_id"], objects)
+    return True
 
 
 def write_summary(
@@ -364,7 +449,10 @@ def write_summary(
     copy_mode: str,
     white_threshold: int,
     merge_max_distance: float,
+    bbox_expand_ratio: float,
+    bbox_expand_min_pixels: float,
     aggregate_stats: Dict[str, float],
+    split_strategy: str,
 ) -> None:
     samples_count = max(int(aggregate_stats.get("samples", 0)), 1)
     summary = {
@@ -373,8 +461,11 @@ def write_summary(
         "copy_mode": copy_mode,
         "num_train": len(samples_train),
         "num_val": len(samples_val),
+        "split_strategy": split_strategy,
         "white_threshold": white_threshold,
         "merge_max_distance": merge_max_distance,
+        "bbox_expand_ratio": bbox_expand_ratio,
+        "bbox_expand_min_pixels": bbox_expand_min_pixels,
         "class_mapping": {str(key): value for key, value in CLASS_MAPPING.items()},
         "processing": {
             "cropped_samples": int(aggregate_stats.get("cropped_samples", 0)),
@@ -388,12 +479,21 @@ def write_summary(
             "merged_objects": int(aggregate_stats.get("merged_objects", 0)),
             "unmatched_primary_objects": int(aggregate_stats.get("unmatched_primary_objects", 0)),
             "unused_secondary_objects": int(aggregate_stats.get("unused_secondary_objects", 0)),
+            "skipped_corrupt_samples": int(aggregate_stats.get("skipped_corrupt_samples", 0)),
         },
-        "notes": [
-            "This dataset was generated from raw DroneVehicle validation files available locally.",
-            "Images are cropped to remove the fixed white border before training.",
-            "Merged annotations expand RGB boxes with nearby thermal boxes so a single supervision target better covers both modalities.",
-        ],
+        "notes": (
+            [
+                "This dataset was generated from raw DroneVehicle train/validation files using the official split.",
+                "Images are cropped to remove the fixed white border before training.",
+                "Merged annotations expand RGB boxes with nearby thermal boxes so a single supervision target better covers both modalities.",
+            ]
+            if split_strategy == "official_split"
+            else [
+                "This dataset was generated from raw DroneVehicle validation files available locally.",
+                "Images are cropped to remove the fixed white border before training.",
+                "Merged annotations expand RGB boxes with nearby thermal boxes so a single supervision target better covers both modalities.",
+            ]
+        ),
     }
     with (target_root / "dataset_summary.json").open("w", encoding="utf-8") as fp:
         json.dump(summary, fp, ensure_ascii=False, indent=2)
@@ -402,25 +502,39 @@ def write_summary(
 def main() -> None:
     args = parse_args()
     source_root = Path(args.source_root).resolve()
+    train_source_root = Path(args.train_source_root).resolve() if args.train_source_root else None
+    val_source_root = Path(args.val_source_root).resolve() if args.val_source_root else None
     target_root = Path(args.target_root).resolve()
 
     if args.clear_target and target_root.exists():
         shutil.rmtree(target_root)
 
     ensure_structure(target_root)
-    samples = collect_samples(source_root)
-    if not samples:
-        raise FileNotFoundError(f"No aligned DroneVehicle samples found under {source_root}")
+    if bool(train_source_root) != bool(val_source_root):
+        raise ValueError("--train-source-root and --val-source-root must be provided together.")
 
-    for sample in samples:
+    if train_source_root and val_source_root:
+        samples_train = collect_samples(train_source_root)
+        samples_val = collect_samples(val_source_root)
+        if not samples_train:
+            raise FileNotFoundError(f"No aligned DroneVehicle training samples found under {train_source_root}")
+        if not samples_val:
+            raise FileNotFoundError(f"No aligned DroneVehicle validation samples found under {val_source_root}")
+        split_strategy = "official_split"
+    else:
+        samples = collect_samples(source_root)
+        if not samples:
+            raise FileNotFoundError(f"No aligned DroneVehicle samples found under {source_root}")
+        rng = random.Random(args.seed)
+        rng.shuffle(samples)
+        split_index = max(1, min(len(samples) - 1, int(len(samples) * args.train_ratio)))
+        samples_train = sorted(samples[:split_index], key=lambda item: item["sample_id"])
+        samples_val = sorted(samples[split_index:], key=lambda item: item["sample_id"])
+        split_strategy = "random_split_from_single_source"
+
+    for sample in [*samples_train, *samples_val]:
         with Image.open(sample["rgb_path"]) as image:
             sample["image_size"] = image.size
-
-    rng = random.Random(args.seed)
-    rng.shuffle(samples)
-    split_index = max(1, min(len(samples) - 1, int(len(samples) * args.train_ratio)))
-    samples_train = sorted(samples[:split_index], key=lambda item: item["sample_id"])
-    samples_val = sorted(samples[split_index:], key=lambda item: item["sample_id"])
 
     aggregate_stats: Dict[str, float] = {
         "samples": 0,
@@ -431,6 +545,7 @@ def main() -> None:
         "merged_objects": 0,
         "unmatched_primary_objects": 0,
         "unused_secondary_objects": 0,
+        "skipped_corrupt_samples": 0,
         "crop_left_total": 0.0,
         "crop_top_total": 0.0,
         "crop_right_margin_total": 0.0,
@@ -446,6 +561,8 @@ def main() -> None:
             args.annotation_source,
             args.white_threshold,
             args.merge_max_distance,
+            args.bbox_expand_ratio,
+            args.bbox_expand_min_pixels,
             aggregate_stats,
         )
     for sample in samples_val:
@@ -457,6 +574,8 @@ def main() -> None:
             args.annotation_source,
             args.white_threshold,
             args.merge_max_distance,
+            args.bbox_expand_ratio,
+            args.bbox_expand_min_pixels,
             aggregate_stats,
         )
 
@@ -468,7 +587,10 @@ def main() -> None:
         args.copy_mode,
         args.white_threshold,
         args.merge_max_distance,
+        args.bbox_expand_ratio,
+        args.bbox_expand_min_pixels,
         aggregate_stats,
+        split_strategy,
     )
 
     print(
@@ -477,11 +599,15 @@ def main() -> None:
                 "target_root": str(target_root),
                 "annotation_source": args.annotation_source,
                 "copy_mode": args.copy_mode,
-                "num_total": len(samples),
+                "split_strategy": split_strategy,
+                "num_total": len(samples_train) + len(samples_val),
                 "num_train": len(samples_train),
                 "num_val": len(samples_val),
+                "bbox_expand_ratio": args.bbox_expand_ratio,
+                "bbox_expand_min_pixels": args.bbox_expand_min_pixels,
                 "cropped_samples": int(aggregate_stats["cropped_samples"]),
                 "merged_objects": int(aggregate_stats["merged_objects"]),
+                "skipped_corrupt_samples": int(aggregate_stats["skipped_corrupt_samples"]),
             },
             ensure_ascii=False,
             indent=2,

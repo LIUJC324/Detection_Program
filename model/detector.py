@@ -23,6 +23,7 @@ class RGBTBackboneWithNeck(nn.Module):
         fpn_out_channels: int = 128,
         backbone_name: str = "lightweight",
         pretrained_backbone_path: str = "",
+        fusion_type: str = "cross_attention",
     ):
         super().__init__()
         backbone_channels = backbone_channels or [32, 64, 96]
@@ -30,6 +31,7 @@ class RGBTBackboneWithNeck(nn.Module):
             backbone_name=backbone_name,
             channels=backbone_channels,
             pretrained_backbone_path=pretrained_backbone_path or None,
+            fusion_type=fusion_type,
         )
         stage_channels = getattr(self.feature_extractor, "out_channels_per_stage", backbone_channels)
         self.needs_fcos_scale_alignment = bool(getattr(self.feature_extractor, "needs_fcos_scale_alignment", False))
@@ -68,6 +70,7 @@ class RGBTDetector(nn.Module):
         fpn_out_channels: int = 128,
         backbone_name: str = "lightweight",
         pretrained_backbone_path: str = "",
+        fusion_type: str = "cross_attention",
         score_thresh: float = 0.2,
         nms_thresh: float = 0.5,
         detections_per_img: int = 100,
@@ -78,6 +81,7 @@ class RGBTDetector(nn.Module):
             fpn_out_channels,
             backbone_name=backbone_name,
             pretrained_backbone_path=pretrained_backbone_path,
+            fusion_type=fusion_type,
         )
         anchor_generator = AnchorGenerator(
             sizes=((8,), (16,), (32,)),
@@ -144,6 +148,7 @@ def build_model(config: Dict) -> RGBTDetector:
         fpn_out_channels=model_cfg.get("fpn_out_channels", 128),
         backbone_name=model_cfg.get("backbone_name", "lightweight"),
         pretrained_backbone_path=model_cfg.get("pretrained_backbone_path", ""),
+        fusion_type=model_cfg.get("fusion_module", "cross_attention"),
         score_thresh=model_cfg.get("score_thresh", 0.2),
         nms_thresh=model_cfg.get("nms_thresh", 0.5),
         detections_per_img=model_cfg.get("detections_per_img", 100),
@@ -177,9 +182,12 @@ def load_checkpoint(
     scheduler=None,
     scaler=None,
     map_location: str | torch.device = "cpu",
+    strict: bool = True,
 ) -> Dict:
     checkpoint = torch.load(path, map_location=map_location, weights_only=False)
-    model.load_state_dict(checkpoint["model_state_dict"], strict=True)
+    load_result = model.load_state_dict(checkpoint["model_state_dict"], strict=strict)
+    checkpoint["_load_state_dict_missing_keys"] = list(getattr(load_result, "missing_keys", []))
+    checkpoint["_load_state_dict_unexpected_keys"] = list(getattr(load_result, "unexpected_keys", []))
     if optimizer is not None and checkpoint.get("optimizer_state_dict") is not None:
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
     if scheduler is not None and checkpoint.get("scheduler_state_dict") is not None:

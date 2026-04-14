@@ -23,6 +23,8 @@ service:
   callback_drop_degenerate_size: 2
   callback_min_interval_ms: 250
   callback_hold_frames_on_empty: 1
+  default_dual_stream_frame_width: 1700
+  default_dual_stream_frame_height: 720
   result_merge_distance: 6
   result_merge_degenerate_size: 2
   enable_rgb_lowlight_enhance: true
@@ -30,7 +32,7 @@ service:
   rgb_lowlight_gamma: 1.15
   rgb_lowlight_clahe_clip_limit: 2.0
   rgb_lowlight_confidence_scale: 0.75
-  default_stream_sample_fps: 2.0
+  default_stream_sample_fps: 3.0
   default_pair_layout: side_by_side_h
   default_rgb_position: left
   callback_timeout_seconds: 5

@@ -20,6 +20,7 @@ def parse_args():
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--format", type=str, choices=["torchscript", "onnx", "both"], default="both")
     parser.add_argument("--device", type=str, default="cpu")
+    parser.add_argument("--precision", type=str, choices=["fp32", "fp16"], default="fp32")
     return parser.parse_args()
 
 
@@ -31,14 +32,21 @@ def main():
     model = build_model(config).to(args.device)
     load_checkpoint(model, args.checkpoint, map_location=args.device)
     model.eval()
+    if args.precision == "fp16":
+        model = model.half()
     wrapper = SingleBatchExportWrapper(model).to(args.device)
+    wrapper.eval()
 
     input_size = config["model"].get("input_size", 640)
     dummy = torch.randn(1, 6, input_size, input_size, device=args.device)
+    if args.precision == "fp16":
+        dummy = dummy.half()
     if args.format in {"torchscript", "both"}:
         ts_path = Path(export_cfg["torchscript_path"])
         if not ts_path.is_absolute():
             ts_path = (PROJECT_ROOT / ts_path).resolve()
+        if args.precision == "fp16":
+            ts_path = ts_path.with_name(f"{ts_path.stem}_fp16{ts_path.suffix}")
         ts_path.parent.mkdir(parents=True, exist_ok=True)
         traced = torch.jit.trace(wrapper, dummy, strict=False)
         traced.save(str(ts_path))
@@ -48,6 +56,8 @@ def main():
         onnx_path = Path(export_cfg["onnx_path"])
         if not onnx_path.is_absolute():
             onnx_path = (PROJECT_ROOT / onnx_path).resolve()
+        if args.precision == "fp16":
+            onnx_path = onnx_path.with_name(f"{onnx_path.stem}_fp16{onnx_path.suffix}")
         onnx_path.parent.mkdir(parents=True, exist_ok=True)
         dynamic_axes = None
         if export_cfg.get("dynamic_axes", True):
@@ -62,10 +72,10 @@ def main():
             input_names=["images"],
             output_names=["boxes", "scores", "labels"],
             dynamic_axes=dynamic_axes,
+            do_constant_folding=True,
         )
         print(f"ONNX exported to {onnx_path}")
 
 
 if __name__ == "__main__":
     main()
-

@@ -10,7 +10,7 @@ from pptx.util import Inches, Pt
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-ARCH_IMAGE = PROJECT_ROOT / "docs" / "project_architecture.png"
+ARCH_IMAGE = PROJECT_ROOT / "docs" / "architecture" / "project_architecture.png"
 OUTPUT_PPT = PROJECT_ROOT / "docs" / "rgbt_uav_detection_简易汇报.pptx"
 
 SLIDE_W = 13.333

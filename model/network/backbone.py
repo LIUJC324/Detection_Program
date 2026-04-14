@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torchvision.models import resnet18
 
-from .fusion_module import CrossModalAttentionFusion
+from .fusion_module import build_fusion_module
 
 
 class ConvBNAct(nn.Sequential):
@@ -128,14 +128,14 @@ class ResNet18Branch(nn.Module):
 
 
 class RGBTFeatureExtractor(nn.Module):
-    def __init__(self, channels: List[int] | None = None):
+    def __init__(self, channels: List[int] | None = None, fusion_type: str = "cross_attention"):
         super().__init__()
         channels = channels or [32, 64, 96]
         self.out_channels_per_stage = channels
         self.needs_fcos_scale_alignment = True
         self.rgb_branch = LightweightBranch(3, channels)
         self.thermal_branch = LightweightBranch(3, channels)
-        self.fusions = nn.ModuleList([CrossModalAttentionFusion(c) for c in channels])
+        self.fusions = nn.ModuleList([build_fusion_module(c, fusion_type=fusion_type) for c in channels])
 
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         if x.shape[1] != 6:
@@ -149,14 +149,14 @@ class RGBTFeatureExtractor(nn.Module):
 
 
 class RGBTResNet18FeatureExtractor(nn.Module):
-    def __init__(self, pretrained_backbone_path: Optional[str] = None):
+    def __init__(self, pretrained_backbone_path: Optional[str] = None, fusion_type: str = "cross_attention"):
         super().__init__()
         channels = [128, 256, 512]
         self.out_channels_per_stage = channels
         self.needs_fcos_scale_alignment = False
         self.rgb_branch = ResNet18Branch(pretrained_backbone_path)
         self.thermal_branch = ResNet18Branch(pretrained_backbone_path)
-        self.fusions = nn.ModuleList([CrossModalAttentionFusion(c) for c in channels])
+        self.fusions = nn.ModuleList([build_fusion_module(c, fusion_type=fusion_type) for c in channels])
 
     def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
         if x.shape[1] != 6:
@@ -172,8 +172,12 @@ def build_feature_extractor(
     backbone_name: str = "lightweight",
     channels: Optional[List[int]] = None,
     pretrained_backbone_path: Optional[str] = None,
+    fusion_type: str = "cross_attention",
 ) -> nn.Module:
     normalized_name = str(backbone_name or "lightweight").strip().lower()
     if normalized_name == "resnet18_twin":
-        return RGBTResNet18FeatureExtractor(pretrained_backbone_path=pretrained_backbone_path or None)
-    return RGBTFeatureExtractor(channels)
+        return RGBTResNet18FeatureExtractor(
+            pretrained_backbone_path=pretrained_backbone_path or None,
+            fusion_type=fusion_type,
+        )
+    return RGBTFeatureExtractor(channels, fusion_type=fusion_type)
