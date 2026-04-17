@@ -1,0 +1,30 @@
+model: /home/liujuncheng/rgbt_uav_detection/yolo11n-obb.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/sanity_rgb_trueobb_quick256_jpg/dataset.yaml
+
+train:
+  epochs: 12
+  imgsz: 640
+  batch: 32
+  device: 0
+  workers: 4
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_sanity
+  name: rgb_quick256_v1
+  pretrained: true
+  resume: false
+  optimizer: auto
+  lr0: 0.001
+  cos_lr: true
+  patience: 12
+  degrees: 0.0
+  scale: 0.3
+  fliplr: 0.5
+  mosaic: 0.1
+  mixup: 0.0
+  close_mosaic: 1
+  cache: false
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false

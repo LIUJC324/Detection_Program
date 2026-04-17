@@ -1,0 +1,29 @@
+model: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs/official_rgbt6_matched_continue_v1/weights/last.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/yolo_obb_official_rgbt6_matched_v1/dataset.yaml
+
+train:
+  epochs: 12
+  imgsz: 640
+  batch: 4
+  device: 0
+  workers: 0
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs
+  name: official_rgbt6_stabilize_v1
+  pretrained: true
+  resume: false
+  optimizer: auto
+  lr0: 0.0003
+  cos_lr: true
+  patience: 6
+  degrees: 0.0
+  scale: 0.3
+  fliplr: 0.5
+  mosaic: 0.1
+  mixup: 0.0
+  close_mosaic: 1
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false

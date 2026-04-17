@@ -1,0 +1,39 @@
+{
+  "model_name": "rgbt_fcos_frontend_6ch",
+  "task": "rgbt_fcos",
+  "model_version": "frontend_demo_6ch_20260416",
+  "input_name": "images",
+  "output_names": ["boxes", "scores", "labels"],
+  "model_input_size": [640, 640],
+  "channels": 6,
+  "num_classes": 5,
+  "class_names": ["car", "truck", "bus", "van", "freight_car"],
+  "preprocess": {
+    "resize_mode": "letterbox",
+    "letterbox_pad_value": 114,
+    "rgb_mode": "rgb",
+    "thermal_mode": "grayscale_to_rgb3",
+    "value_range": "0_to_1",
+    "extra_mean_std_normalization": false,
+    "channel_layout": "rgb3_then_thermal3",
+    "concat_order": ["rgb_r", "rgb_g", "rgb_b", "thermal_r", "thermal_g", "thermal_b"]
+  },
+  "pairing": {
+    "require_same_resolution": true,
+    "auto_resize_thermal_to_rgb": true,
+    "timestamp_sync_required_for_live_demo": true
+  },
+  "postprocess": {
+    "score_threshold": 0.05,
+    "nms_threshold": 0.5,
+    "max_detections": 100,
+    "box_format": "xyxy",
+    "labels_dtype": "int64",
+    "scores_dtype": "float32"
+  },
+  "frontend_demo_notes": {
+    "works_for_browser_local_inference": true,
+    "thermal_must_participate_in_tensor": true,
+    "do_not_use_yolo_obb_3ch_config_for_this_model": true
+  }
+}

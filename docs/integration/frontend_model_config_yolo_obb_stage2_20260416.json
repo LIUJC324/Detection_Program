@@ -1,0 +1,49 @@
+{
+  "model_name": "yolo_obb_stage2_frontend",
+  "task": "yolo_obb",
+  "model_version": "2026-04-13_stage2_archive",
+  "input_name": "images",
+  "output_name": "output0",
+  "model_input_size": [640, 640],
+  "channels": 3,
+  "class_names": ["car", "truck", "bus", "van", "freight_car"],
+  "num_classes": 5,
+  "raw_output": {
+    "candidate_count_hint": 8400,
+    "layout_hint": ["[1, 10, 8400]", "[1, 8400, 10]"],
+    "per_candidate_fields": ["cx", "cy", "w", "h", "angle", "cls0", "cls1", "cls2", "cls3", "cls4"],
+    "has_objectness": false,
+    "transpose_if_needed": true,
+    "target_layout": "[8400, 10]"
+  },
+  "decode": {
+    "box_format": "xywhr",
+    "angle_unit": "radian",
+    "class_score_mode": "max_class_only",
+    "confidence_formula": "max(class_scores)",
+    "expand_per_class": false
+  },
+  "postprocess": {
+    "conf_threshold": 0.25,
+    "iou_threshold": 0.5,
+    "max_det": 300,
+    "nms_type": "obb_preferred_or_polygon_fallback",
+    "nms_input": "decoded_boxes_only"
+  },
+  "render": {
+    "preferred_geometry": "polygon",
+    "fallback_geometry": "xywhr",
+    "show_angle": true
+  },
+  "sanity_checks": {
+    "raw_8400_is_normal": true,
+    "nms_after_1000_plus_is_abnormal": true,
+    "likely_error_sources": [
+      "wrong_output_layout",
+      "wrong_class_score_parsing",
+      "per_class_box_expansion",
+      "nms_before_decode",
+      "wrong_angle_unit"
+    ]
+  }
+}

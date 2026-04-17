@@ -1,0 +1,34 @@
+model: /home/liujuncheng/rgbt_uav_detection/weights/yolo11_obb_rgbt6_fastdemo_init.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/yolo_obb_official_rgb_trueobb_v1/dataset_rgbt6.yaml
+
+train:
+  epochs: 5
+  imgsz: 640
+  batch: 4
+  device: 0
+  workers: 0
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs
+  name: official_rgbt6_stage1_quick_v1
+  pretrained: true
+  resume: false
+  optimizer: auto
+  lr0: 0.001
+  cos_lr: true
+  patience: 5
+  degrees: 0.0
+  scale: 0.5
+  fliplr: 0.5
+  mosaic: 1.0
+  mixup: 0.0
+  close_mosaic: 2
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false
+
+rgbt:
+  channel_layout: rgb3_then_thermal3
+  thermal_mode: grayscale_to_rgb3
+  note: "Quick 6-channel warm start for getting boxes as soon as possible."

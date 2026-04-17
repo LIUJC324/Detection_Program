@@ -1,0 +1,30 @@
+model: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_runs/official_rgbt6_full_official_speedup_v3/weights/last.pt
+data: /home/liujuncheng/rgbt_uav_detection/datasets/sanity_rgbt6_overfit32/dataset.yaml
+
+train:
+  epochs: 8
+  imgsz: 640
+  batch: 16
+  device: 0
+  workers: 0
+  project: /home/liujuncheng/rgbt_uav_detection/outputs/yolo_obb_sanity
+  name: rgbt6_overfit32_v2
+  pretrained: true
+  resume: false
+  optimizer: auto
+  lr0: 0.0005
+  cos_lr: false
+  patience: 30
+  degrees: 0.0
+  scale: 0.0
+  fliplr: 0.0
+  mosaic: 0.0
+  mixup: 0.0
+  close_mosaic: 0
+  cache: false
+  save: true
+  val: true
+  amp: false
+  seed: 42
+  exist_ok: true
+  plots: false

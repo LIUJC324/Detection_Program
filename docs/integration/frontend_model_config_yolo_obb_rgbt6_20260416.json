@@ -1,0 +1,47 @@
+{
+  "model_name": "yolo_obb_rgbt6_frontend",
+  "task": "yolo_obb_rgbt6",
+  "model_version": "minimal_6ch_draft_20260416",
+  "input_name": "images",
+  "output_name": "output0",
+  "model_input_size": [640, 640],
+  "channels": 6,
+  "num_classes": 5,
+  "class_names": ["car", "truck", "bus", "van", "freight_car"],
+  "preprocess": {
+    "resize_mode": "letterbox",
+    "letterbox_pad_value": 114,
+    "rgb_mode": "rgb",
+    "thermal_mode": "grayscale_to_rgb3",
+    "value_range": "0_to_1",
+    "channel_layout": "rgb3_then_thermal3",
+    "concat_order": ["rgb_r", "rgb_g", "rgb_b", "thermal_r", "thermal_g", "thermal_b"]
+  },
+  "raw_output": {
+    "candidate_count_hint": 8400,
+    "layout_hint": ["[1, 10, 8400]", "[1, 8400, 10]"],
+    "per_candidate_fields": ["cx", "cy", "w", "h", "angle", "cls0", "cls1", "cls2", "cls3", "cls4"],
+    "has_objectness": false,
+    "transpose_if_needed": true,
+    "target_layout": "[8400, 10]"
+  },
+  "decode": {
+    "box_format": "xywhr",
+    "angle_unit": "radian",
+    "class_score_mode": "max_class_only",
+    "confidence_formula": "max(class_scores)",
+    "expand_per_class": false
+  },
+  "postprocess": {
+    "conf_threshold": 0.25,
+    "iou_threshold": 0.5,
+    "max_det": 300,
+    "nms_type": "obb_preferred_or_polygon_fallback",
+    "nms_input": "decoded_boxes_only"
+  },
+  "notes": {
+    "frontend_goal": "keep online demo in 6-channel RGB-T form",
+    "current_strategy": "minimal migration from RGB-only YOLO-OBB to 6-channel input",
+    "important": "thermal image must actually be concatenated into the tensor, not only displayed"
+  }
+}

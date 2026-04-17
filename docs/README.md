@@ -8,11 +8,12 @@ Each non-trivial change set also gets its own folder under `docs/changes/`.
 
 1. [training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
 2. [training/项目需求确认与借鉴优化方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/项目需求确认与借鉴优化方案_20260409.md)
-3. [changes/20260411_optimization_roadmap/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_optimization_roadmap/README.md)
-4. [changes/20260411_dataset_audit/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_dataset_audit/README.md)
-5. [changes/20260411_reliability_refine/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_reliability_refine/README.md)
-6. [integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
-7. [ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
+3. [reference/赛题创新点与关键模块说明_20260416.md](/home/liujuncheng/rgbt_uav_detection/docs/reference/赛题创新点与关键模块说明_20260416.md)
+4. [changes/20260411_optimization_roadmap/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_optimization_roadmap/README.md)
+5. [changes/20260411_dataset_audit/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_dataset_audit/README.md)
+6. [changes/20260411_reliability_refine/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_reliability_refine/README.md)
+7. [integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
+8. [ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
 
 ## By Topic
 
@@ -39,9 +40,11 @@ Each non-trivial change set also gets its own folder under `docs/changes/`.
   - 架构图
   - 后端架构图
   - 分层图与原理图
+  - PlantUML 架构源码
 - `reference/`
   - 长文档原理说明
   - 代码与方法映射
+  - 赛题创新点与关键模块说明
 - `changes/`
   - 每一轮非平凡改动的归档目录
   - 目录名统一为 `YYYYMMDD_topic`
@@ -53,11 +56,12 @@ If you are joining the project now, read in this order:
 
 1. 模型端跟踪与当前状态
 2. 项目需求确认与借鉴方向
-3. 下次直接可执行的优化路线
-4. 数据审计结论
-5. 最近一次改动归档
-6. 固定公网联调清单
-7. 部署与服务日志说明
+3. 赛题创新点与关键模块说明
+4. 下次直接可执行的优化路线
+5. 数据审计结论
+6. 最近一次改动归档
+7. 固定公网联调清单
+8. 部署与服务日志说明
 
 ## Placement Rules
 
