@@ -7,13 +7,13 @@ Each non-trivial change set also gets its own folder under `docs/changes/`.
 
 ## Start Here
 
-1. [reference/ML_基本原理与代码对应说明.md](/home/liujuncheng/rgbt_uav_detection/docs/reference/ML_基本原理与代码对应说明.md)
-2. [architecture/模型端架构图讲解_20260416.md](/home/liujuncheng/rgbt_uav_detection/docs/architecture/模型端架构图讲解_20260416.md)
-3. [integration/实时视频演示与前后端衔接说明.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/实时视频演示与前后端衔接说明.md)
-4. [integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
-5. [ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
-6. [training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
-7. [changes/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/README.md)
+1. [reference/ML_基本原理与代码对应说明.md](reference/ML_基本原理与代码对应说明.md)
+2. [architecture/模型端架构图讲解_20260416.md](architecture/模型端架构图讲解_20260416.md)
+3. [integration/实时视频演示与前后端衔接说明.md](integration/实时视频演示与前后端衔接说明.md)
+4. [integration/发给前后端同学的固定公网联调清单_20260407.md](integration/发给前后端同学的固定公网联调清单_20260407.md)
+5. [ops/稳定部署方案_20260407.md](ops/稳定部署方案_20260407.md)
+6. [training/模型端问题排查、框架修复与续训方案_20260409.md](training/模型端问题排查、框架修复与续训方案_20260409.md)
+7. [changes/README.md](changes/README.md)
 
 ## By Topic
 
@@ -73,8 +73,8 @@ If you are joining the project now, read in this order:
 ## Canonical Paths
 
 - 接口契约主文档：
-  [integration/interface.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/interface.md)
+  [integration/interface.md](integration/interface.md)
 - 架构图资源目录：
-  [architecture](/home/liujuncheng/rgbt_uav_detection/docs/architecture)
+  [architecture](architecture)
 - 变更归档入口：
-  [changes/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/README.md)
+  [changes/README.md](changes/README.md)

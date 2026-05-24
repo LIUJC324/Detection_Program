@@ -38,8 +38,8 @@
 
 当前最重要的说明文档：
 
-- [docs/reference/ML_基本原理与代码对应说明.md](/home/liujuncheng/rgbt_uav_detection/docs/reference/ML_基本原理与代码对应说明.md)
-- [docs/README.md](/home/liujuncheng/rgbt_uav_detection/docs/README.md)
+- [docs/reference/ML_基本原理与代码对应说明.md](docs/reference/ML_基本原理与代码对应说明.md)
+- [docs/README.md](docs/README.md)
 
 ## 仓库结构
 
@@ -222,7 +222,7 @@ curl -fsS http://127.0.0.1:18000/v1/model/info
 
 - 可切换为双分支 `ResNet18`
 - 实验配置文件：
-  - [configs/experiment_resnet18_transfer.yaml](/home/liujuncheng/rgbt_uav_detection/configs/experiment_resnet18_transfer.yaml)
+  - [configs/experiment_resnet18_transfer.yaml](configs/experiment_resnet18_transfer.yaml)
 
 当前限制：
 
@@ -251,19 +251,19 @@ curl -fsS http://127.0.0.1:18000/v1/model/info
 
 相关脚本：
 
-- [scripts/export_dronevehicle_annotated_demo.py](/home/liujuncheng/rgbt_uav_detection/scripts/export_dronevehicle_annotated_demo.py)
-- [scripts/export_dronevehicle_showcase.py](/home/liujuncheng/rgbt_uav_detection/scripts/export_dronevehicle_showcase.py)
+- [scripts/export_dronevehicle_annotated_demo.py](scripts/export_dronevehicle_annotated_demo.py)
+- [scripts/export_dronevehicle_showcase.py](scripts/export_dronevehicle_showcase.py)
 
 ## 文档导航
 
 建议从这里开始看：
 
-1. [docs/training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
-2. [docs/training/项目需求确认与借鉴优化方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/项目需求确认与借鉴优化方案_20260409.md)
-3. [docs/integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
-4. [docs/integration/实时视频演示与前后端衔接说明.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/实时视频演示与前后端衔接说明.md)
-5. [docs/ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
-6. [docs/README.md](/home/liujuncheng/rgbt_uav_detection/docs/README.md)
+1. [docs/training/模型端问题排查、框架修复与续训方案_20260409.md](docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
+2. [docs/training/项目需求确认与借鉴优化方案_20260409.md](docs/training/项目需求确认与借鉴优化方案_20260409.md)
+3. [docs/integration/发给前后端同学的固定公网联调清单_20260407.md](docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
+4. [docs/integration/实时视频演示与前后端衔接说明.md](docs/integration/实时视频演示与前后端衔接说明.md)
+5. [docs/ops/稳定部署方案_20260407.md](docs/ops/稳定部署方案_20260407.md)
+6. [docs/README.md](docs/README.md)
 
 ## 后续路线
 
