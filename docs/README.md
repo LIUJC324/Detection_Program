@@ -3,17 +3,17 @@
 `docs/` is the repository knowledge base.  
 Long-lived knowledge stays in its topic folder.  
 Each non-trivial change set also gets its own folder under `docs/changes/`.
+当前仓库主线已经进入模型端完成态，训练、推理、服务、联调和部署文档都按这条主线维护。
 
 ## Start Here
 
-1. [training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
-2. [training/项目需求确认与借鉴优化方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/项目需求确认与借鉴优化方案_20260409.md)
-3. [reference/赛题创新点与关键模块说明_20260416.md](/home/liujuncheng/rgbt_uav_detection/docs/reference/赛题创新点与关键模块说明_20260416.md)
-4. [changes/20260411_optimization_roadmap/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_optimization_roadmap/README.md)
-5. [changes/20260411_dataset_audit/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_dataset_audit/README.md)
-6. [changes/20260411_reliability_refine/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/20260411_reliability_refine/README.md)
-7. [integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
-8. [ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
+1. [reference/ML_基本原理与代码对应说明.md](/home/liujuncheng/rgbt_uav_detection/docs/reference/ML_基本原理与代码对应说明.md)
+2. [architecture/模型端架构图讲解_20260416.md](/home/liujuncheng/rgbt_uav_detection/docs/architecture/模型端架构图讲解_20260416.md)
+3. [integration/实时视频演示与前后端衔接说明.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/实时视频演示与前后端衔接说明.md)
+4. [integration/发给前后端同学的固定公网联调清单_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/integration/发给前后端同学的固定公网联调清单_20260407.md)
+5. [ops/稳定部署方案_20260407.md](/home/liujuncheng/rgbt_uav_detection/docs/ops/稳定部署方案_20260407.md)
+6. [training/模型端问题排查、框架修复与续训方案_20260409.md](/home/liujuncheng/rgbt_uav_detection/docs/training/模型端问题排查、框架修复与续训方案_20260409.md)
+7. [changes/README.md](/home/liujuncheng/rgbt_uav_detection/docs/changes/README.md)
 
 ## By Topic
 
@@ -54,14 +54,13 @@ Each non-trivial change set also gets its own folder under `docs/changes/`.
 
 If you are joining the project now, read in this order:
 
-1. 模型端跟踪与当前状态
-2. 项目需求确认与借鉴方向
-3. 赛题创新点与关键模块说明
-4. 下次直接可执行的优化路线
-5. 数据审计结论
-6. 最近一次改动归档
-7. 固定公网联调清单
-8. 部署与服务日志说明
+1. ML 主说明文档
+2. 模型端架构说明
+3. 实时视频演示与前后端衔接说明
+4. 固定公网联调清单
+5. 稳定部署方案
+6. 模型端历史跟踪与问题修复记录
+7. 变更归档入口
 
 ## Placement Rules
 
