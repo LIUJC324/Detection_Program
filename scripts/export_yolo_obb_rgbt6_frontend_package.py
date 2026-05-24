@@ -69,7 +69,13 @@ def build_rgbt6_model(source: Path, model_yaml: Path, thermal_scale: float) -> O
             merged[key] = dst_tensor
             continue
         src_tensor = src_state[src_key]
-        if src_tensor.shape[1] == 3 and dst_tensor.shape[1] == 6 and key.endswith(".conv.weight"):
+        if (
+            src_tensor.ndim >= 2
+            and dst_tensor.ndim >= 2
+            and src_tensor.shape[1] == 3
+            and dst_tensor.shape[1] == 6
+            and key.endswith(".conv.weight")
+        ):
             merged[key] = build_expanded_first_conv(src_tensor, thermal_scale).to(dtype=dst_tensor.dtype)
         elif src_tensor.shape == dst_tensor.shape:
             merged[key] = src_tensor.to(dtype=dst_tensor.dtype)
@@ -129,12 +135,12 @@ def export_onnx(model: OBBModel, onnx_path: Path, imgsz: int, opset: int) -> Non
 
 def write_config(config_src: Path, config_dst: Path, onnx_path: Path, init_pt: Path) -> None:
     cfg = json.loads(config_src.read_text(encoding="utf-8"))
-    cfg["model_name"] = "yolo_obb_rgbt6_frontend_fastdemo"
-    cfg["model_version"] = "exported_fastdemo_20260416"
+    cfg["model_name"] = onnx_path.stem
+    cfg["model_version"] = f"exported_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     cfg["onnx_path"] = str(onnx_path.resolve())
     cfg["source_checkpoint"] = str(init_pt.resolve())
-    cfg["notes"]["current_strategy"] = "fast 6ch compatibility export; thermal channels are neutralized first so frontend can switch to 6ch immediately without waiting for full RGB-T OBB training"
-    cfg["notes"]["important"] = "this version accepts RGB+Thermal 6ch input, but thermal branch is currently compatibility-initialized and should be fine-tuned later"
+    cfg["notes"]["current_strategy"] = "exported from latest trained RGB-T 6ch YOLO-OBB checkpoint for frontend deployment"
+    cfg["notes"]["important"] = "this version uses the latest small-target-enhanced trained checkpoint and is intended for direct RGB+Thermal 6-channel frontend inference"
     config_dst.parent.mkdir(parents=True, exist_ok=True)
     config_dst.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -153,7 +159,14 @@ def main() -> None:
     export_onnx(model, args.onnx.resolve(), int(args.imgsz), int(args.opset))
     write_config(args.config_src.resolve(), args.config_dst.resolve(), args.onnx.resolve(), args.init_pt.resolve())
 
-    print(f"first_conv={tuple(model.model[0].conv.weight.shape)}")
+    first_conv_shape = None
+    for module in model.model:
+        conv = getattr(module, "conv", None)
+        weight = getattr(conv, "weight", None)
+        if weight is not None:
+            first_conv_shape = tuple(weight.shape)
+            break
+    print(f"first_conv={first_conv_shape}")
     print(f"init_pt={args.init_pt.resolve()}")
     print(f"onnx={args.onnx.resolve()}")
     print(f"config={args.config_dst.resolve()}")
